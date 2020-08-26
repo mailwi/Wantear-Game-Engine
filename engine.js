@@ -11,6 +11,8 @@ let mouseDown = false
 let mouseX
 let mouseY
 
+let seeCollisions
+
 const events = {}
 
 window.onresize = resize
@@ -37,6 +39,8 @@ function resize () {
 window.onload = init
 
 function init () {
+  seeCollisions = false
+
   canvas = document.querySelector('#canvas')
   context = canvas.getContext('2d')
 
@@ -103,14 +107,16 @@ function gameLoop () {
     }
   }
 
-  for (let i = 0; i < collisionShapes.length; i++) {
-    fill('rgba(255, 0, 0, 0.25)')
+  if (seeCollisions) {
+    for (let i = 0; i < collisionShapes.length; i++) {
+      fill('rgba(255, 0, 0, 0.25)')
 
-    const collisionShape = collisionShapes[i]
-    if (collisionShape instanceof CollisionRect) {
-      rect(collisionShape.sprite.x + collisionShape.x, collisionShape.sprite.y + collisionShape.y, collisionShape.w, collisionShape.h)
-    } else if (collisionShape instanceof CollisionPoint) {
-      rect(collisionShape.sprite.x + collisionShape.x - 2, collisionShape.sprite.y + collisionShape.y - 2, 4, 4)
+      const collisionShape = collisionShapes[i]
+      if (collisionShape instanceof CollisionRect) {
+        rect(collisionShape.sprite.x + collisionShape.x, collisionShape.sprite.y + collisionShape.y, collisionShape.w, collisionShape.h)
+      } else if (collisionShape instanceof CollisionPoint) {
+        rect(collisionShape.sprite.x + collisionShape.x - 2, collisionShape.sprite.y + collisionShape.y - 2, 4, 4)
+      }
     }
   }
 
@@ -205,9 +211,10 @@ class Sprite {
     this.code = code
     this.x = 0
     this.y = 0
-    this.clones = []
+    this.local = {}
     this.collisionShape = null
     this.whenThisSpriteClickedEvent = null
+    this.whenIStartAsACloneEvent = null
   }
 
   goto (x, y) {
@@ -227,6 +234,39 @@ class Sprite {
     this.whenThisSpriteClickedEvent = code
   }
 
+  createCloneOf (name) {
+    const sprite = sprites[name]
+    const clone = new Sprite(name, sprite.code)
+    clone.x = sprite.x
+    clone.y = sprite.y
+    clone.local = Object.assign({}, sprite.local)
+
+    if (name in clones) {
+      clones[name].push(clone)
+    } else {
+      clones[name] = [clone]
+    }
+
+    clone.setup()
+    clone.whenIStartAsACloneEvent()
+  }
+
+  createCloneOfMySelf () {
+    this.createCloneOf(this.name)
+  }
+
+  whenIStartAsAClone (code) {
+    this.whenIStartAsACloneEvent = code
+  }
+
+  set (name, value) {
+    this.local[name] = value
+  }
+
+  get (name) {
+    return this.local[name]
+  }
+
   collisionPoint (x, y) {
     this.collisionShape = new CollisionPoint(this, x, y)
     collisionShapes.push(this.collisionShape)
@@ -243,6 +283,7 @@ class Sprite {
 }
 
 const sprites = {}
+const clones = {}
 
 function createSprite (name, code) {
   const sprite = new Sprite(name, code)

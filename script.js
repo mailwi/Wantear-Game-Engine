@@ -1,28 +1,25 @@
 function setup () {
   createSprite('Sprite1', function () {
-    this.collisionRect(-25, -25, 50, 50)
-
-    let move = true
+    this.collisionRect(0, 0, 50, 50)
 
     whenGameStart(() => {
       this.goto(100, 100)
 
       forever(() => {
-        if (move) this.x += delay * 50
         fill('gray')
-        if (mouseDown) {
-          fill('red')
-        }
-
-        if (this.touching('mouse-pointer')) {
-          console.log('mouse around Sprite1')
-        }
-
-        rect(this.x - 25, this.y - 25, 50, 50)
+        rect(this.x, this.y, 50, 50)
       })
+    })
 
-      this.whenThisSpriteClicked(() => {
-        move = !move
+    this.whenThisSpriteClicked(() => {
+      this.createCloneOfMySelf()
+    })
+
+    this.whenIStartAsAClone(() => {
+      forever(() => {
+        this.x += delay * 150
+        fill('red')
+        rect(this.x + 15, this.y + 15, 20, 20)
       })
     })
   })

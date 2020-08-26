@@ -11,6 +11,8 @@ let mouseDown = false
 let mouseX
 let mouseY
 
+let countToTrash = 0
+
 let seeCollisions
 
 const events = {}
@@ -72,7 +74,7 @@ function init () {
   if ('whenGameStart' in events) {
     const whenGameStartEvent = events.whenGameStart
     for (let i = 0; i < whenGameStartEvent.length; i++) {
-      whenGameStartEvent[i]()
+      if (whenGameStartEvent[i]) whenGameStartEvent[i].code()
     }
   }
 
@@ -88,13 +90,29 @@ function gameLoop () {
 
   fps = Math.round(1 / delay)
 
+  if (countToTrash > 50) {
+    for (const name in events) {
+      const event = events[name]
+      events[name] = event.filter(sprite => sprite !== null)
+    }
+
+    for (const name in clones) {
+      const sprites = clones[name]
+      clones[name] = sprites.filter(sprite => sprite !== null)
+    }
+
+    collisionShapes = collisionShapes.filter(collisionShape => collisionShape !== null)
+
+    countToTrash = 0
+  }
+
   for (let i = 0; i < collisionShapes.length; i++) {
-    collisionShapes[i].reset()
+    if (collisionShapes[i]) collisionShapes[i].reset()
   }
 
   for (let i = 0; i < collisionShapes.length; i++) {
     for (let j = i + 1; j < collisionShapes.length; j++) {
-      collisionShapes[i].eval(collisionShapes[j])
+      if (collisionShapes[i]) collisionShapes[i].eval(collisionShapes[j])
     }
   }
 
@@ -103,7 +121,20 @@ function gameLoop () {
   if ('forever' in events) {
     const foreverEvent = events.forever
     for (let i = 0; i < foreverEvent.length; i++) {
-      foreverEvent[i]()
+      if (foreverEvent[i]) foreverEvent[i].code()
+    }
+  }
+
+  if ('foreverWait' in events) {
+    const foreverWaitEvent = events.foreverWait
+    for (let i = 0; i < foreverWaitEvent.length; i++) {
+      if (!foreverWaitEvent[i].wait) {
+        foreverWaitEvent[i].wait = true
+        foreverWaitEvent[i].code().then(() => {
+          foreverWaitEvent[i].wait = false
+          return true
+        })
+      }
     }
   }
 
@@ -155,6 +186,13 @@ class CollisionShape {
     }
     return false
   }
+
+  rectRect (r1x, r1y, r1w, r1h, r2x, r2y, r2w, r2h) {
+    if (r1x + r1w >= r2x && r1x <= r2x + r2w && r1y + r1h >= r2y && r1y <= r2y + r2h) {
+      return true
+    }
+    return false
+  }
 }
 
 class CollisionPoint extends CollisionShape {
@@ -197,11 +235,19 @@ class CollisionRect extends CollisionShape {
         this.addCollidingShape(collisionShape.sprite.name, collisionShape)
         collisionShape.addCollidingShape(this.sprite.name, this)
       }
+    } else if (collisionShape instanceof CollisionRect) {
+      if (this.rectRect(this.sprite.x + this.x, this.sprite.y + this.y, this.w, this.h,
+        collisionShape.sprite.x + collisionShape.x,
+        collisionShape.sprite.y + collisionShape.y,
+        collisionShape.w, collisionShape.h)) {
+        this.addCollidingShape(collisionShape.sprite.name, collisionShape)
+        collisionShape.addCollidingShape(this.sprite.name, this)
+      }
     }
   }
 }
 
-const collisionShapes = []
+let collisionShapes = []
 
 /* Sprite system */
 
@@ -215,6 +261,7 @@ class Sprite {
     this.collisionShape = null
     this.whenThisSpriteClickedEvent = null
     this.whenIStartAsACloneEvent = null
+    this.clone = false
   }
 
   goto (x, y) {
@@ -223,7 +270,6 @@ class Sprite {
   }
 
   touching (name) {
-    // console.log(this.collisionShape && this.collisionShape.colliding())
     if (this.collisionShape && this.collisionShape.colliding() && name in this.collisionShape.collidingShapes) {
       return true
     }
@@ -248,6 +294,7 @@ class Sprite {
     }
 
     clone.setup()
+    clone.clone = true
     clone.whenIStartAsACloneEvent()
   }
 
@@ -267,6 +314,38 @@ class Sprite {
     return this.local[name]
   }
 
+  deleteThisClone () {
+    if (this.clone) {
+      const spriteClones = clones[this.name]
+      for (let i = 0; i < spriteClones.length; i++) {
+        if (spriteClones[i] === this) {
+          spriteClones[i] = null
+          break
+        }
+      }
+
+      for (const key in events) {
+        const sprites = events[key]
+        for (let i = 0; i < sprites.length; i++) {
+          if (sprites[i] && sprites[i].sprite === this) {
+            sprites[i] = null
+            break
+          }
+        }
+      }
+
+      this.collisionShape.sprite = null
+      for (let i = 0; i < collisionShapes.length; i++) {
+        if (collisionShapes[i] === this.collisionShape) {
+          collisionShapes[i] = null
+        }
+      }
+      this.collisionShape = null
+
+      countToTrash++
+    }
+  }
+
   collisionPoint (x, y) {
     this.collisionShape = new CollisionPoint(this, x, y)
     collisionShapes.push(this.collisionShape)
@@ -279,6 +358,20 @@ class Sprite {
 
   setup () {
     this.code()
+  }
+
+  /* event functions */
+
+  whenGameStart (code) {
+    subscribe('whenGameStart', code, this)
+  }
+
+  forever (code) {
+    subscribe('forever', code, this)
+  }
+
+  foreverWait (code) {
+    subscribe('foreverWait', code, this)
   }
 }
 
@@ -293,7 +386,7 @@ function createSprite (name, code) {
 createSprite('mouse-pointer', function () {
   this.collisionPoint(0, 0)
 
-  whenGameStart(() => {
+  this.whenGameStart(() => {
     canvas.addEventListener('mouseup', _ => {
       if (this.collisionShape.colliding()) {
         const collidingShapes = this.collisionShape.collidingShapes
@@ -309,7 +402,7 @@ createSprite('mouse-pointer', function () {
       }
     })
 
-    forever(() => {
+    this.forever(() => {
       this.goto(mouseX, mouseY)
     })
   })
@@ -317,20 +410,12 @@ createSprite('mouse-pointer', function () {
 
 /* event functions */
 
-function subscribe (name, code) {
+function subscribe (name, code, sprite) {
   if (name in events) {
-    events[name].push(code)
+    events[name].push({ sprite: sprite, code: code })
   } else {
-    events[name] = [code]
+    events[name] = [{ sprite: sprite, code: code }]
   }
-}
-
-function whenGameStart (code) {
-  subscribe('whenGameStart', code)
-}
-
-function forever (code) {
-  subscribe('forever', code)
 }
 
 /* draw functions */
@@ -349,4 +434,12 @@ function font (size, font) {
 
 function text (text, x, y) {
   context.fillText(text, x * sc, y * sc)
+}
+
+/* other functions */
+
+function waitSeconds (seconds) {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(), seconds * 1000)
+  })
 }

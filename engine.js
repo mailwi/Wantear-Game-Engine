@@ -119,6 +119,8 @@ function gameLoop () {
       clones[name] = sprites.filter(sprite => sprite !== null)
     }
 
+    layers = layers.filter(sprite => sprite !== null)
+
     collisionShapes = collisionShapes.filter(collisionShape => collisionShape !== null)
 
     countToTrash = 0
@@ -133,8 +135,6 @@ function gameLoop () {
       if (collisionShapes[i]) collisionShapes[i].eval(collisionShapes[j])
     }
   }
-
-  context.clearRect(0, 0, canvas.width, canvas.height)
 
   if ('forever' in events) {
     const foreverEvent = events.forever
@@ -153,6 +153,21 @@ function gameLoop () {
           return true
         })
       }
+    }
+  }
+
+  context.clearRect(0, 0, canvas.width, canvas.height)
+
+  layers.sort((a, b) => {
+    if (a === null) return 1
+    if (b === null) return -1
+    return a.layer - b.layer
+  })
+
+  for (let i = 0; i < layers.length; i++) {
+    const sprite = layers[i]
+    if (sprite && sprite.drawSprite) {
+      sprite.drawSprite()
     }
   }
 
@@ -276,12 +291,15 @@ class Sprite {
     this.x = 0
     this.y = 0
     this.size = 1
+    this.layer = -1
+    this.drawSprite = null
     this.local = {}
     this.costumes = {}
     this.costumesOrder = []
     this.currentCostume = ''
     this.currentCostumeNumber = 0
     this.currentCostumeImage = null
+    this.show = true
     this.costumesLoaded = null
     this.collisionShape = null
     this.whenThisSpriteClickedEvent = null
@@ -310,7 +328,17 @@ class Sprite {
     const clone = new Sprite(name, sprite.code)
     clone.x = sprite.x
     clone.y = sprite.y
+    clone.size = sprite.size
+    clone.layer = sprite.layer
     clone.local = Object.assign({}, sprite.local)
+    clone.costumes = Object.assign({}, sprite.costumes)
+    clone.costumesOrder = Object.assign([], sprite.costumesOrder)
+    clone.currentCostume = sprite.currentCostume
+    clone.currentCostumeNumber = sprite.currentCostumeNumber
+    clone.currentCostumeImage = sprite.currentCostumeImage
+    clone.costumesLoaded = true
+
+    layers.push(clone)
 
     if (name in clones) {
       clones[name].push(clone)
@@ -318,8 +346,8 @@ class Sprite {
       clones[name] = [clone]
     }
 
-    clone.setup()
     clone.clone = true
+    clone.setup()
     clone.whenIStartAsACloneEvent()
   }
 
@@ -365,11 +393,13 @@ class Sprite {
   }
 
   addCostumes (images) {
-    this.costumesLoaded = this._engineAddCostumes(images)
+    if (!this.clone) {
+      this.costumesLoaded = this._engineAddCostumes(images)
+    }
   }
 
   drawCostume () {
-    if (this.currentCostumeImage) {
+    if (this.currentCostumeImage && this.show) {
       context.drawImage(this.currentCostumeImage, this.x * sc, this.y * sc, this.currentCostumeImage.width * this.size * sc, this.currentCostumeImage.height * this.size * sc)
     }
   }
@@ -391,34 +421,65 @@ class Sprite {
     this.currentCostumeImage = this.costumes[name].image
   }
 
-  /* costume functions */
+  show () {
+    this.show = true
+  }
+
+  hide () {
+    this.show = false
+  }
+
+  /* layer functions */
+
+  goToBackLayer () {
+    if (this.layer !== 0) {
+      this.layer = 0
+    }
+  }
+
+  goToFrontLayer () {
+    if (this.layer !== layerIndex - 1) {
+      this.layer = layerIndex
+      layerIndex++
+    }
+  }
+
+  goBackwardLayers (goIndex) {
+    this.layer -= goIndex
+    if (this.layer < 0) this.layer = 0
+  }
+
+  goForwardLayers (goIndex) {
+    this.layer += goIndex
+    if (this.layer >= layerIndex) layerIndex = this.layer + 1
+  }
+
+  /* layer functions */
+
+  draw (code) {
+    this.drawSprite = code
+  }
 
   deleteThisClone () {
     if (this.clone) {
       const spriteClones = clones[this.name]
-      for (let i = 0; i < spriteClones.length; i++) {
-        if (spriteClones[i] === this) {
-          spriteClones[i] = null
-          break
-        }
-      }
+      const index = spriteClones.indexOf(this)
+      spriteClones[index] = null
 
       for (const key in events) {
         const sprites = events[key]
-        for (let i = 0; i < sprites.length; i++) {
-          if (sprites[i] && sprites[i].sprite === this) {
-            sprites[i] = null
-            break
-          }
+        const index = sprites.findIndex((spriteData) => spriteData && spriteData.sprite === this)
+        if (index !== -1) {
+          sprites[index] = null
         }
       }
 
+      const indexLayer = layers.indexOf(this)
+      layers[indexLayer] = null
+
       this.collisionShape.sprite = null
-      for (let i = 0; i < collisionShapes.length; i++) {
-        if (collisionShapes[i] === this.collisionShape) {
-          collisionShapes[i] = null
-        }
-      }
+      const indexShape = collisionShapes.indexOf(this.collisionShape)
+      collisionShapes[indexShape] = null
       this.collisionShape = null
 
       countToTrash++
@@ -473,10 +534,16 @@ class Sprite {
 
 const sprites = {}
 const clones = {}
+let layers = []
+
+let layerIndex = 0
 
 function createSprite (name, code) {
   const sprite = new Sprite(name, code)
   sprites[name] = sprite
+  layers.push(sprite)
+  sprite.layer = layerIndex
+  layerIndex++
 }
 
 createSprite('mouse-pointer', function () {

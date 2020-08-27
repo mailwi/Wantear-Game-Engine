@@ -43,13 +43,6 @@ function setup () {
         } else {
           this.set('animation', 0)
         }
-
-        this.drawCostume()
-
-        fill('black')
-        font('25', 'Arial')
-        text(fps + ' ' + obj.enemySpeed, 50, 50)
-        text('Score: ' + obj.score, 50, 75)
       })
 
       this.foreverWait(async () => {
@@ -72,10 +65,18 @@ function setup () {
             })
             break
         }
+
+        this.goToFrontLayer()
       })
     })
 
-    this.whenThisSpriteClicked(() => {
+    this.draw(() => {
+      this.drawCostume()
+
+      fill('black')
+      font('25', 'Arial')
+      text(fps + ' ' + obj.enemySpeed, 50, 50)
+      text('Score: ' + obj.score, 50, 75)
     })
 
     this.whenKeyPressed('Space', () => {
@@ -98,13 +99,15 @@ function setup () {
       this.forever(() => {
         this.x += delay * 300
 
-        fill('red')
-        rect(this.x - 5, this.y - 5, 10, 10)
-
         if (this.touching('Enemy') || this.x > 1280) {
           this.deleteThisClone()
         }
       })
+    })
+
+    this.draw(() => {
+      fill('red')
+      rect(this.x - 5, this.y - 5, 10, 10)
     })
   })
 
@@ -129,13 +132,15 @@ function setup () {
       this.forever(() => {
         this.x -= delay * (150 + obj.enemySpeed * 5)
 
-        fill('green')
-        rect(this.x - 25, this.y - 25, 50, 50)
-
         if (this.touching('Bullet')) {
           obj.score++
           this.deleteThisClone()
         }
+      })
+
+      this.draw(() => {
+        fill('green')
+        rect(this.x - 25, this.y - 25, 50, 50)
       })
     })
   })

@@ -7,29 +7,71 @@ function setup () {
   }
 
   createSprite('Player', function () {
+    this.addCostumes([
+      { name: 'idle', data: 'images/platformChar_idle.png' },
+      { name: 'walk1', data: 'images/platformChar_walk1.png' },
+      { name: 'walk2', data: 'images/platformChar_walk2.png' }
+    ])
+
     this.collisionRect(0, 0, 50, 50)
+
+    this.set('animation', 0)
+    this.set('move', false)
 
     this.whenGameStart(() => {
       this.goto(100, 100)
 
       this.forever(() => {
+        this.set('move', false)
+
         if (keyPressed('KeyW')) {
           this.y -= delay * 150
           obj.py = this.y + 25
+          this.set('animation', 1)
+          this.set('move', true)
         }
 
         if (keyPressed('KeyS')) {
           this.y += delay * 150
           obj.py = this.y + 25
+          this.set('animation', 1)
+          this.set('move', true)
         }
 
-        fill('gray')
-        rect(this.x, this.y, 50, 50)
+        if (this.get('move')) {
+          this.set('animation', 1)
+        } else {
+          this.set('animation', 0)
+        }
+
+        this.drawCostume()
 
         fill('black')
         font('25', 'Arial')
         text(fps + ' ' + obj.enemySpeed, 50, 50)
         text('Score: ' + obj.score, 50, 75)
+      })
+
+      this.foreverWait(async () => {
+        await this.costumesLoaded
+
+        const animation = this.get('animation')
+        switch (animation) {
+          case 0:
+            this.switchCostumeTo('idle')
+            break
+          case 1:
+            this.switchCostumeTo('walk1')
+            await this.repeatUntil(() => this.get('animation') !== 1, async () => {
+              await waitSeconds(0.25)
+              if (this.currentCostume !== 'walk2') {
+                this.nextCostume()
+              } else {
+                this.switchCostumeTo('walk1')
+              }
+            })
+            break
+        }
       })
     })
 

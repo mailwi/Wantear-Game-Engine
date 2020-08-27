@@ -46,6 +46,8 @@ function init () {
 
   canvas = document.querySelector('#canvas')
   context = canvas.getContext('2d')
+  context.imageSmoothingEnabled = true
+  context.imageSmoothingQuality = 'high'
 
   canvas.addEventListener('mousedown', e => {
     mouseDown = true
@@ -273,7 +275,14 @@ class Sprite {
     this.code = code
     this.x = 0
     this.y = 0
+    this.size = 1
     this.local = {}
+    this.costumes = {}
+    this.costumesOrder = []
+    this.currentCostume = ''
+    this.currentCostumeNumber = 0
+    this.currentCostumeImage = null
+    this.costumesLoaded = null
     this.collisionShape = null
     this.whenThisSpriteClickedEvent = null
     this.whenIStartAsACloneEvent = null
@@ -329,6 +338,60 @@ class Sprite {
   get (name) {
     return this.local[name]
   }
+
+  /* costume functions */
+
+  async _engineAddCostumes (images) {
+    function getImage (data) {
+      return new Promise((resolve) => {
+        const image = new Image()
+        image.addEventListener('load', () => resolve(image))
+        image.src = data
+      })
+    }
+
+    for (let i = 0; i < images.length; i++) {
+      const costume = images[i]
+      const image = await getImage(costume.data)
+      this.costumes[costume.name] = { image: image, index: i }
+      this.costumesOrder.push(costume.name)
+
+      if (this.currentCostumeImage === null) {
+        this.currentCostume = name
+        this.currentCostumeNumber = i + 1
+        this.currentCostumeImage = image
+      }
+    }
+  }
+
+  addCostumes (images) {
+    this.costumesLoaded = this._engineAddCostumes(images)
+  }
+
+  drawCostume () {
+    if (this.currentCostumeImage) {
+      context.drawImage(this.currentCostumeImage, this.x * sc, this.y * sc, this.currentCostumeImage.width * this.size * sc, this.currentCostumeImage.height * this.size * sc)
+    }
+  }
+
+  nextCostume () {
+    this.currentCostumeNumber++
+    if (this.currentCostumeNumber > this.costumesOrder.length) {
+      this.currentCostumeNumber = 1
+    }
+
+    const index = this.currentCostumeNumber - 1
+    this.currentCostume = this.costumesOrder[index]
+    this.currentCostumeImage = this.costumes[this.currentCostume].image
+  }
+
+  switchCostumeTo (name) {
+    this.currentCostume = name
+    this.currentCostumeNumber = this.costumes[name].index + 1
+    this.currentCostumeImage = this.costumes[name].image
+  }
+
+  /* costume functions */
 
   deleteThisClone () {
     if (this.clone) {
@@ -390,6 +453,19 @@ class Sprite {
     subscribe('foreverWait', code, this)
   }
 
+  repeatUntil (condition, code) {
+    const repeatFunc = async (resolve) => {
+      if (!condition()) {
+        await code()
+        setTimeout(() => repeatFunc(resolve), 1)
+      } else {
+        resolve()
+      }
+    }
+
+    return new Promise(repeatFunc)
+  }
+
   whenKeyPressed (keyCode, code) {
     subscribe('whenKeyPressed', code, this, keyCode)
   }
@@ -429,6 +505,19 @@ createSprite('mouse-pointer', function () {
 })
 
 /* event functions */
+
+function unsubscribe (name, sprite, index = null) {
+  if (name in events) {
+    if (index) {
+      events[name][index] = null
+      countToTrash++
+    } else {
+      index = events[name].findIndex((spriteData) => spriteData.sprite === sprite)
+      events[name][index] = null
+      countToTrash++
+    }
+  }
+}
 
 function subscribe (name, code, sprite, data) {
   if (name in events) {

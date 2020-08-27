@@ -13,8 +13,14 @@ function setup () {
       this.goto(100, 100)
 
       this.forever(() => {
-        if (mouseDown) {
-          this.goto(mouseX - 25, mouseY - 25)
+        if (keyPressed('KeyW')) {
+          this.y -= delay * 150
+          obj.py = this.y + 25
+        }
+
+        if (keyPressed('KeyS')) {
+          this.y += delay * 150
+          obj.py = this.y + 25
         }
 
         fill('gray')
@@ -28,6 +34,9 @@ function setup () {
     })
 
     this.whenThisSpriteClicked(() => {
+    })
+
+    this.whenKeyPressed('Space', () => {
       obj.px = this.x + 25
       obj.py = this.y + 25
       this.createCloneOf('Bullet')

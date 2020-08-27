@@ -10,6 +10,7 @@ let fps
 let mouseDown = false
 let mouseX
 let mouseY
+const keyCodes = {}
 
 let countToTrash = 0
 
@@ -61,6 +62,21 @@ function init () {
     mouseDown = false
     mouseX = Math.round(e.offsetX / sc)
     mouseY = Math.round(e.offsetY / sc)
+  })
+
+  document.addEventListener('keydown', e => {
+    keyCodes[e.code] = true
+  })
+
+  document.addEventListener('keyup', e => {
+    keyCodes[e.code] = false
+
+    if ('whenKeyPressed' in events) {
+      const whenKeyPressedEvent = events.whenKeyPressed
+      for (let i = 0; i < whenKeyPressedEvent.length; i++) {
+        if (whenKeyPressedEvent[i] && whenKeyPressedEvent[i].data === e.code) whenKeyPressedEvent[i].code()
+      }
+    }
   })
 
   resize()
@@ -373,6 +389,10 @@ class Sprite {
   foreverWait (code) {
     subscribe('foreverWait', code, this)
   }
+
+  whenKeyPressed (keyCode, code) {
+    subscribe('whenKeyPressed', code, this, keyCode)
+  }
 }
 
 const sprites = {}
@@ -410,11 +430,11 @@ createSprite('mouse-pointer', function () {
 
 /* event functions */
 
-function subscribe (name, code, sprite) {
+function subscribe (name, code, sprite, data) {
   if (name in events) {
-    events[name].push({ sprite: sprite, code: code })
+    events[name].push({ sprite: sprite, code: code, data: data })
   } else {
-    events[name] = [{ sprite: sprite, code: code }]
+    events[name] = [{ sprite: sprite, code: code, data: data }]
   }
 }
 
@@ -436,10 +456,17 @@ function text (text, x, y) {
   context.fillText(text, x * sc, y * sc)
 }
 
-/* other functions */
+/* global functions */
 
 function waitSeconds (seconds) {
   return new Promise((resolve) => {
     setTimeout(() => resolve(), seconds * 1000)
   })
+}
+
+function keyPressed (keyCode) {
+  if (keyCodes[keyCode]) {
+    return true
+  }
+  return false
 }

@@ -1,4 +1,6 @@
 function setup () {
+  seeCollisions = true
+
   const obj = {
     score: 0,
     px: 0,
@@ -13,18 +15,28 @@ function setup () {
       { name: 'walk2', data: 'images/platformChar_walk2.png' }
     ])
 
-    this.collisionRect(0, 0, 50, 50)
+    this.addSounds({
+      music: 'sounds/hero.mp3',
+      shoot: 'sounds/bow.ogg'
+    })
+
+    this.collisionRect(25, 32, 50, 50)
 
     this.set('animation', 0)
     this.set('move', false)
 
-    this.whenGameStart(() => {
+    this.whenGameStart(async () => {
+      await this.soundsLoaded
+      this.startSound('music')
+      this.setVolumeTo('music', 0.25)
+
       this.goto(100, 100)
 
       this.forever(() => {
         this.set('move', false)
 
         if (keyPressed('KeyW')) {
+          this.mirror(true)
           this.y -= delay * 150
           obj.py = this.y + 25
           this.set('animation', 1)
@@ -32,6 +44,7 @@ function setup () {
         }
 
         if (keyPressed('KeyS')) {
+          this.mirror(false)
           this.y += delay * 150
           obj.py = this.y + 25
           this.set('animation', 1)
@@ -79,15 +92,28 @@ function setup () {
       text('Score: ' + obj.score, 50, 75)
     })
 
-    this.whenKeyPressed('Space', () => {
+    this.whenKeyPressed('Space', async () => {
+      await this.playSoundUntilDone('shoot', true)
       obj.px = this.x + 25
       obj.py = this.y + 25
       this.createCloneOf('Bullet')
+      // this.startSound('shoot', true)
+    })
+
+    this.whenKeyPressed('keyY', () => {
+      obj.px = this.x + 25
+      obj.py = this.y + 25
+      this.createCloneOf('Bullet')
+      this.startSound('shoot', true)
     })
   })
 
   createSprite('Bullet', function () {
-    this.collisionRect(-5, -5, 10, 10)
+    this.addCostumes([
+      { name: 'shoot', data: 'images/shoot.png' }
+    ])
+
+    this.collisionRect(25, 25, 10, 10)
 
     this.whenGameStart(() => {
       this.goto(-100, -100)
@@ -106,8 +132,9 @@ function setup () {
     })
 
     this.draw(() => {
-      fill('red')
-      rect(this.x - 5, this.y - 5, 10, 10)
+      // fill('red')
+      // rect(this.x - 5, this.y - 5, 10, 10)
+      this.drawCostume()
     })
   })
 

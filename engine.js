@@ -12,6 +12,12 @@ let mouseX
 let mouseY
 const keyCodes = {}
 
+const prerenderCanvas = document.createElement('canvas')
+const prerenderContext = prerenderCanvas.getContext('2d')
+prerenderContext.imageSmoothingEnabled = true
+prerenderContext.imageSmoothingQuality = 'high'
+document.body.append(prerenderCanvas)
+
 let countToTrash = 0
 
 let seeCollisions
@@ -294,6 +300,7 @@ class Sprite {
     this.layer = -1
     this.drawSprite = null
     this.local = {}
+
     this.costumes = {}
     this.costumesOrder = []
     this.currentCostume = ''
@@ -301,9 +308,15 @@ class Sprite {
     this.currentCostumeImage = null
     this.show = true
     this.costumesLoaded = null
+    this.costumeMirror = false
+
+    this.sounds = {}
+    this.soundsLoaded = null
+
     this.collisionShape = null
     this.whenThisSpriteClickedEvent = null
     this.whenIStartAsACloneEvent = null
+
     this.clone = false
   }
 
@@ -400,7 +413,21 @@ class Sprite {
 
   drawCostume () {
     if (this.currentCostumeImage && this.show) {
-      context.drawImage(this.currentCostumeImage, this.x * sc, this.y * sc, this.currentCostumeImage.width * this.size * sc, this.currentCostumeImage.height * this.size * sc)
+      const width = this.currentCostumeImage.width * this.size * sc
+      const height = this.currentCostumeImage.height * this.size * sc
+
+      prerenderCanvas.width = width
+      prerenderCanvas.height = height
+
+      prerenderContext.clearRect(0, 0, prerenderCanvas.width, prerenderCanvas.height)
+
+      if (this.costumeMirror) {
+        prerenderContext.translate(width, 0)
+        prerenderContext.scale(-1, 1)
+      }
+
+      prerenderContext.drawImage(this.currentCostumeImage, 0, 0, width, height)
+      context.drawImage(prerenderCanvas, this.x * sc, this.y * sc)
     }
   }
 
@@ -419,6 +446,14 @@ class Sprite {
     this.currentCostume = name
     this.currentCostumeNumber = this.costumes[name].index + 1
     this.currentCostumeImage = this.costumes[name].image
+  }
+
+  mirror (value) {
+    if (value !== undefined) {
+      this.costumeMirror = value
+    } else {
+      this.costumeMirror = !this.costumeMirror
+    }
   }
 
   show () {
@@ -454,7 +489,84 @@ class Sprite {
     if (this.layer >= layerIndex) layerIndex = this.layer + 1
   }
 
-  /* layer functions */
+  /* sound functions */
+
+  async _engineAddSounds (sounds) {
+    function getSound (data) {
+      return new Promise((resolve) => {
+        const sound = new Audio(data)
+        sound.addEventListener('canplaythrough', () => resolve(sound))
+      })
+    }
+
+    for (const name in sounds) {
+      this.sounds[name] = await getSound(sounds[name])
+    }
+  }
+
+  addSounds (sounds) {
+    this.soundsLoaded = this._engineAddSounds(sounds)
+  }
+
+  async playSoundUntilDone (name, instanceSound = false) {
+    function soundEnded (sound) {
+      return new Promise((resolve) => {
+        const soundFunc = () => {
+          sound.removeEventListener('ended', soundFunc)
+          resolve()
+        }
+        sound.addEventListener('ended', soundFunc)
+      })
+    }
+
+    let sound
+    if (!instanceSound) {
+      sound = this.sounds[name]
+    } else {
+      sound = new Audio(this.sounds[name].src)
+    }
+
+    sound.play()
+    await soundEnded(sound)
+  }
+
+  startSound (name, instanceSound = false) {
+    let sound
+    if (!instanceSound) {
+      sound = this.sounds[name]
+    } else {
+      sound = new Audio(this.sounds[name].src)
+    }
+
+    sound.play()
+  }
+
+  pauseSound (name) {
+    this.sounds[name].pause()
+  }
+
+  stopSound (name) {
+    this.sounds[name].pause()
+    this.sounds[name].currentTime = 0
+  }
+
+  changeVolumeBy (name, value) {
+    this.sounds[name].volume += value
+  }
+
+  setVolumeTo (name, value) {
+    this.sounds[name].volume = value
+  }
+
+  getVolume (name) {
+    return this.sounds[name].volume
+  }
+
+  getSound (name) {
+    return this.sounds[name]
+  }
+
+  /* sound functions */
 
   draw (code) {
     this.drawSprite = code

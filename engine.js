@@ -268,79 +268,40 @@ class Sprite {
 
   /* sound functions */
 
-  async _engineAddSounds (sounds) {
-    function getSound (data) {
-      return new Promise((resolve) => {
-        const sound = new Audio(data)
-        sound.addEventListener('canplaythrough', () => resolve(sound))
-      })
-    }
-
-    for (const name in sounds) {
-      this.sounds[name] = await getSound(sounds[name])
-    }
-  }
-
   addSounds (sounds) {
-    this.soundsLoaded = this._engineAddSounds(sounds)
+    this.soundsLoaded = audioEngine.addSounds(this, sounds)
   }
 
   async playSoundUntilDone (name, instanceSound = false) {
-    function soundEnded (sound) {
-      return new Promise((resolve) => {
-        const soundFunc = () => {
-          sound.removeEventListener('ended', soundFunc)
-          resolve()
-        }
-        sound.addEventListener('ended', soundFunc)
-      })
-    }
-
-    let sound
-    if (!instanceSound) {
-      sound = this.sounds[name]
-    } else {
-      sound = new Audio(this.sounds[name].src)
-    }
-
-    sound.play()
-    await soundEnded(sound)
+    await audioEngine.playSoundUntilDone(this, name, instanceSound)
   }
 
   startSound (name, instanceSound = false) {
-    let sound
-    if (!instanceSound) {
-      sound = this.sounds[name]
-    } else {
-      sound = new Audio(this.sounds[name].src)
-    }
-
-    sound.play()
+    audioEngine.startSound(this, name, instanceSound)
   }
 
   pauseSound (name) {
-    this.sounds[name].pause()
+    audioEngine.pauseSound(this, name)
   }
 
   stopSound (name) {
-    this.sounds[name].pause()
-    this.sounds[name].currentTime = 0
+    audioEngine.stopSound(this, name)
   }
 
   changeVolumeBy (name, value) {
-    this.sounds[name].volume += value
+    audioEngine.changeVolumeBy(this, name, value)
   }
 
   setVolumeTo (name, value) {
-    this.sounds[name].volume = value
+    audioEngine.setVolumeTo(this, name, value)
   }
 
   getVolume (name) {
-    return this.sounds[name].volume
+    audioEngine.getVolume(this, name)
   }
 
   getSound (name) {
-    return this.sounds[name]
+    audioEngine.getSound(this, name)
   }
 
   /* sound functions */

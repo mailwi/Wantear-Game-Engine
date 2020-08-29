@@ -16,19 +16,19 @@ function setup () {
     ])
 
     this.addSounds({
-      music: 'sounds/hero.mp3',
+      // music: 'sounds/hero.mp3',
       shoot: 'sounds/bow.ogg'
     })
 
-    this.collisionRect(25, 32, 50, 50)
+    collisionRect(this, 25, 32, 50, 50)
 
     this.set('animation', 0)
     this.set('move', false)
 
     this.whenGameStart(async () => {
       await this.soundsLoaded
-      this.startSound('music')
-      this.setVolumeTo('music', 0.25)
+      // this.startSound('music')
+      // this.setVolumeTo('music', 0.25)
 
       this.goto(100, 100)
 
@@ -36,7 +36,7 @@ function setup () {
         this.set('move', false)
 
         if (keyPressed('KeyW')) {
-          this.mirror(true)
+          // this.mirror(true)
           this.y -= delay * 150
           obj.py = this.y + 25
           this.set('animation', 1)
@@ -44,7 +44,7 @@ function setup () {
         }
 
         if (keyPressed('KeyS')) {
-          this.mirror(false)
+          // this.mirror(false)
           this.y += delay * 150
           obj.py = this.y + 25
           this.set('animation', 1)
@@ -93,11 +93,11 @@ function setup () {
     })
 
     this.whenKeyPressed('Space', async () => {
-      await this.playSoundUntilDone('shoot', true)
+      // await this.playSoundUntilDone('shoot', true)
       obj.px = this.x + 25
       obj.py = this.y + 25
       this.createCloneOf('Bullet')
-      // this.startSound('shoot', true)
+      this.startSound('shoot', true)
     })
 
     this.whenKeyPressed('keyY', () => {
@@ -113,7 +113,7 @@ function setup () {
       { name: 'shoot', data: 'images/shoot.png' }
     ])
 
-    this.collisionRect(25, 25, 10, 10)
+    collisionRect(this, 25, 25, 10, 10)
 
     this.whenGameStart(() => {
       this.goto(-100, -100)
@@ -139,7 +139,7 @@ function setup () {
   })
 
   createSprite('Enemy', function () {
-    this.collisionRect(-25, -25, 50, 50)
+    collisionRect(this, -25, -25, 50, 50)
 
     this.whenGameStart(() => {
       this.goto(-100, -100)
@@ -161,6 +161,8 @@ function setup () {
 
         if (this.touching('Bullet')) {
           obj.score++
+          this.deleteThisClone()
+        } else if (this.x < 0) {
           this.deleteThisClone()
         }
       })

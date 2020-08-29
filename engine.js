@@ -1,76 +1,22 @@
 const displayWidth = 1280
 const displayHeight = 720
 const rc = displayHeight / displayWidth
-let sc = 1
-let canvas
-let context
 let delay
 let oldTimeStamp
 let fps
-let mouseDown = false
+let mouseDown
 let mouseX
 let mouseY
 const keyCodes = {}
 
-const prerenderCanvas = document.createElement('canvas')
-const prerenderContext = prerenderCanvas.getContext('2d')
-prerenderContext.imageSmoothingEnabled = true
-prerenderContext.imageSmoothingQuality = 'high'
-document.body.append(prerenderCanvas)
-
 let countToTrash = 0
 
-let seeCollisions
-
 const events = {}
-
-window.onresize = resize
-
-function resize () {
-  const dpi = window.devicePixelRatio
-
-  const height = window.innerWidth * rc
-  if (height > window.innerHeight) {
-    const w = Math.floor(window.innerHeight / rc * dpi)
-
-    canvas.width = w
-    canvas.height = Math.floor(window.innerHeight * dpi)
-    sc = w / displayWidth
-  } else {
-    const w = Math.floor(window.innerWidth * dpi)
-
-    canvas.width = w
-    canvas.height = Math.floor(height * dpi)
-    sc = w / displayWidth
-  }
-}
 
 window.onload = init
 
 function init () {
-  seeCollisions = false
-
-  canvas = document.querySelector('#canvas')
-  context = canvas.getContext('2d')
-  context.imageSmoothingEnabled = true
-  context.imageSmoothingQuality = 'high'
-
-  canvas.addEventListener('mousedown', e => {
-    mouseDown = true
-    mouseX = Math.round(e.offsetX / sc)
-    mouseY = Math.round(e.offsetY / sc)
-  })
-
-  canvas.addEventListener('mousemove', e => {
-    mouseX = Math.round(e.offsetX / sc)
-    mouseY = Math.round(e.offsetY / sc)
-  })
-
-  canvas.addEventListener('mouseup', e => {
-    mouseDown = false
-    mouseX = Math.round(e.offsetX / sc)
-    mouseY = Math.round(e.offsetY / sc)
-  })
+  mouseDown = false
 
   document.addEventListener('keydown', e => {
     keyCodes[e.code] = true
@@ -86,8 +32,6 @@ function init () {
       }
     }
   })
-
-  resize()
 
   setup()
 
@@ -125,22 +69,14 @@ function gameLoop () {
       clones[name] = sprites.filter(sprite => sprite !== null)
     }
 
-    layers = layers.filter(sprite => sprite !== null)
+    if (layersNeedLogic) render.layersToTrash()
 
-    collisionShapes = collisionShapes.filter(collisionShape => collisionShape !== null)
+    if (collisionsNeedLogic) render.collisionsToTrash()
 
     countToTrash = 0
   }
 
-  for (let i = 0; i < collisionShapes.length; i++) {
-    if (collisionShapes[i]) collisionShapes[i].reset()
-  }
-
-  for (let i = 0; i < collisionShapes.length; i++) {
-    for (let j = i + 1; j < collisionShapes.length; j++) {
-      if (collisionShapes[i]) collisionShapes[i].eval(collisionShapes[j])
-    }
-  }
+  if (collisionsNeedLogic) render.collisionsLoop()
 
   if ('forever' in events) {
     const foreverEvent = events.forever
@@ -162,131 +98,14 @@ function gameLoop () {
     }
   }
 
-  context.clearRect(0, 0, canvas.width, canvas.height)
+  render.clear()
 
-  layers.sort((a, b) => {
-    if (a === null) return 1
-    if (b === null) return -1
-    return a.layer - b.layer
-  })
+  render.layersLoop()
 
-  for (let i = 0; i < layers.length; i++) {
-    const sprite = layers[i]
-    if (sprite && sprite.drawSprite) {
-      sprite.drawSprite()
-    }
-  }
-
-  if (seeCollisions) {
-    for (let i = 0; i < collisionShapes.length; i++) {
-      fill('rgba(255, 0, 0, 0.25)')
-
-      const collisionShape = collisionShapes[i]
-      if (collisionShape instanceof CollisionRect) {
-        rect(collisionShape.sprite.x + collisionShape.x, collisionShape.sprite.y + collisionShape.y, collisionShape.w, collisionShape.h)
-      } else if (collisionShape instanceof CollisionPoint) {
-        rect(collisionShape.sprite.x + collisionShape.x - 2, collisionShape.sprite.y + collisionShape.y - 2, 4, 4)
-      }
-    }
-  }
+  if (collisionsNeedLogic) render.drawCollisions()
 
   window.requestAnimationFrame(gameLoop)
 }
-
-/* Collision classes */
-
-class CollisionShape {
-  constructor () {
-    this.collidingShapes = {}
-  }
-
-  reset () {
-    this.collidingShapes = {}
-  }
-
-  addCollidingShape (name, shape) {
-    if (name in this.collidingShapes) {
-      this.collidingShapes[name].push(shape)
-    } else {
-      this.collidingShapes[name] = [shape]
-    }
-  }
-
-  colliding () {
-    if (Object.keys(this.collidingShapes).length > 0) {
-      return true
-    }
-    return false
-  }
-
-  pointRect (px, py, rx, ry, rw, rh) {
-    if (px >= rx && px <= rx + rw && py >= ry && py <= ry + rh) {
-      return true
-    }
-    return false
-  }
-
-  rectRect (r1x, r1y, r1w, r1h, r2x, r2y, r2w, r2h) {
-    if (r1x + r1w >= r2x && r1x <= r2x + r2w && r1y + r1h >= r2y && r1y <= r2y + r2h) {
-      return true
-    }
-    return false
-  }
-}
-
-class CollisionPoint extends CollisionShape {
-  constructor (sprite, x, y) {
-    super()
-    this.sprite = sprite
-    this.x = x
-    this.y = y
-  }
-
-  eval (collisionShape) {
-    if (collisionShape instanceof CollisionRect) {
-      if (this.pointRect(this.sprite.x + this.x, this.sprite.y + this.y,
-        collisionShape.sprite.x + collisionShape.x,
-        collisionShape.sprite.y + collisionShape.y,
-        collisionShape.w, collisionShape.h)) {
-        this.addCollidingShape(collisionShape.sprite.name, collisionShape)
-        collisionShape.addCollidingShape(this.sprite.name, this)
-      }
-    }
-  }
-}
-
-class CollisionRect extends CollisionShape {
-  constructor (sprite, x, y, w, h) {
-    super()
-    this.sprite = sprite
-    this.x = x
-    this.y = y
-    this.w = w
-    this.h = h
-  }
-
-  eval (collisionShape) {
-    if (collisionShape instanceof CollisionPoint) {
-      if (this.pointRect(collisionShape.sprite.x + collisionShape.x, collisionShape.sprite.y + collisionShape.y,
-        this.sprite.x + this.x,
-        this.sprite.y + this.y,
-        this.w, this.h)) {
-        this.addCollidingShape(collisionShape.sprite.name, collisionShape)
-        collisionShape.addCollidingShape(this.sprite.name, this)
-      }
-    } else if (collisionShape instanceof CollisionRect) {
-      if (this.rectRect(this.sprite.x + this.x, this.sprite.y + this.y, this.w, this.h,
-        collisionShape.sprite.x + collisionShape.x,
-        collisionShape.sprite.y + collisionShape.y,
-        collisionShape.w, collisionShape.h)) {
-        this.addCollidingShape(collisionShape.sprite.name, collisionShape)
-        collisionShape.addCollidingShape(this.sprite.name, this)
-      }
-    }
-  }
-}
-
-let collisionShapes = []
 
 /* Sprite system */
 
@@ -296,8 +115,9 @@ class Sprite {
     this.code = code
     this.x = 0
     this.y = 0
+    this.z = 0
     this.size = 1
-    this.layer = -1
+    this.layer = null
     this.drawSprite = null
     this.local = {}
 
@@ -305,7 +125,7 @@ class Sprite {
     this.costumesOrder = []
     this.currentCostume = ''
     this.currentCostumeNumber = 0
-    this.currentCostumeImage = null
+    this.currentCostumeData = null
     this.show = true
     this.costumesLoaded = null
     this.costumeMirror = false
@@ -313,7 +133,7 @@ class Sprite {
     this.sounds = {}
     this.soundsLoaded = null
 
-    this.collisionShape = null
+    if (collisionsNeedLogic) this.collisionShape = null
     this.whenThisSpriteClickedEvent = null
     this.whenIStartAsACloneEvent = null
 
@@ -326,10 +146,7 @@ class Sprite {
   }
 
   touching (name) {
-    if (this.collisionShape && this.collisionShape.colliding() && name in this.collisionShape.collidingShapes) {
-      return true
-    }
-    return false
+    return render.touching(this, name)
   }
 
   whenThisSpriteClicked (code) {
@@ -348,10 +165,10 @@ class Sprite {
     clone.costumesOrder = Object.assign([], sprite.costumesOrder)
     clone.currentCostume = sprite.currentCostume
     clone.currentCostumeNumber = sprite.currentCostumeNumber
-    clone.currentCostumeImage = sprite.currentCostumeImage
+    clone.currentCostumeData = sprite.currentCostumeData
     clone.costumesLoaded = true
 
-    layers.push(clone)
+    render.layersOnlyAdd(clone)
 
     if (name in clones) {
       clones[name].push(clone)
@@ -382,52 +199,15 @@ class Sprite {
 
   /* costume functions */
 
-  async _engineAddCostumes (images) {
-    function getImage (data) {
-      return new Promise((resolve) => {
-        const image = new Image()
-        image.addEventListener('load', () => resolve(image))
-        image.src = data
-      })
-    }
-
-    for (let i = 0; i < images.length; i++) {
-      const costume = images[i]
-      const image = await getImage(costume.data)
-      this.costumes[costume.name] = { image: image, index: i }
-      this.costumesOrder.push(costume.name)
-
-      if (this.currentCostumeImage === null) {
-        this.currentCostume = name
-        this.currentCostumeNumber = i + 1
-        this.currentCostumeImage = image
-      }
-    }
-  }
-
-  addCostumes (images) {
+  addCostumes (costumesData) {
     if (!this.clone) {
-      this.costumesLoaded = this._engineAddCostumes(images)
+      this.costumesLoaded = render.addCostumes(this, costumesData)
     }
   }
 
   drawCostume () {
-    if (this.currentCostumeImage && this.show) {
-      const width = this.currentCostumeImage.width * this.size * sc
-      const height = this.currentCostumeImage.height * this.size * sc
-
-      prerenderCanvas.width = width
-      prerenderCanvas.height = height
-
-      prerenderContext.clearRect(0, 0, prerenderCanvas.width, prerenderCanvas.height)
-
-      if (this.costumeMirror) {
-        prerenderContext.translate(width, 0)
-        prerenderContext.scale(-1, 1)
-      }
-
-      prerenderContext.drawImage(this.currentCostumeImage, 0, 0, width, height)
-      context.drawImage(prerenderCanvas, this.x * sc, this.y * sc)
+    if (this.currentCostumeData && this.show) {
+      render.drawCostume(this)
     }
   }
 
@@ -439,13 +219,13 @@ class Sprite {
 
     const index = this.currentCostumeNumber - 1
     this.currentCostume = this.costumesOrder[index]
-    this.currentCostumeImage = this.costumes[this.currentCostume].image
+    this.currentCostumeData = this.costumes[this.currentCostume].data
   }
 
   switchCostumeTo (name) {
     this.currentCostume = name
     this.currentCostumeNumber = this.costumes[name].index + 1
-    this.currentCostumeImage = this.costumes[name].image
+    this.currentCostumeData = this.costumes[name].data
   }
 
   mirror (value) {
@@ -467,26 +247,23 @@ class Sprite {
   /* layer functions */
 
   goToBackLayer () {
-    if (this.layer !== 0) {
-      this.layer = 0
-    }
+    render.goToBackLayer(this)
   }
 
   goToFrontLayer () {
-    if (this.layer !== layerIndex - 1) {
-      this.layer = layerIndex
-      layerIndex++
-    }
+    render.goToFrontLayer(this)
   }
 
-  goBackwardLayers (goIndex) {
-    this.layer -= goIndex
-    if (this.layer < 0) this.layer = 0
+  goBackwardLayers (goValue) {
+    render.goBackwardLayers(this, goValue)
   }
 
-  goForwardLayers (goIndex) {
-    this.layer += goIndex
-    if (this.layer >= layerIndex) layerIndex = this.layer + 1
+  goForwardLayers (goValue) {
+    render.goForwardLayers(this, goValue)
+  }
+
+  setLayer (value) {
+    render.setLayer(this, value)
   }
 
   /* sound functions */
@@ -586,26 +363,12 @@ class Sprite {
         }
       }
 
-      const indexLayer = layers.indexOf(this)
-      layers[indexLayer] = null
+      if (layersNeedLogic) render.deleteFromLayers(this)
 
-      this.collisionShape.sprite = null
-      const indexShape = collisionShapes.indexOf(this.collisionShape)
-      collisionShapes[indexShape] = null
-      this.collisionShape = null
+      if (collisionsNeedLogic) render.deleteFromCollisions(this)
 
       countToTrash++
     }
-  }
-
-  collisionPoint (x, y) {
-    this.collisionShape = new CollisionPoint(this, x, y)
-    collisionShapes.push(this.collisionShape)
-  }
-
-  collisionRect (x, y, w, h) {
-    this.collisionShape = new CollisionRect(this, x, y, w, h)
-    collisionShapes.push(this.collisionShape)
   }
 
   setup () {
@@ -646,42 +409,14 @@ class Sprite {
 
 const sprites = {}
 const clones = {}
-let layers = []
-
-let layerIndex = 0
 
 function createSprite (name, code) {
   const sprite = new Sprite(name, code)
   sprites[name] = sprite
-  layers.push(sprite)
-  sprite.layer = layerIndex
-  layerIndex++
+  render.layersAdd(sprite)
 }
 
-createSprite('mouse-pointer', function () {
-  this.collisionPoint(0, 0)
-
-  this.whenGameStart(() => {
-    canvas.addEventListener('mouseup', _ => {
-      if (this.collisionShape.colliding()) {
-        const collidingShapes = this.collisionShape.collidingShapes
-        for (const name in collidingShapes) {
-          const shapes = collidingShapes[name]
-          for (let i = 0; i < shapes.length; i++) {
-            const sprite = shapes[i].sprite
-            if (sprite.whenThisSpriteClickedEvent) {
-              sprite.whenThisSpriteClickedEvent()
-            }
-          }
-        }
-      }
-    })
-
-    this.forever(() => {
-      this.goto(mouseX, mouseY)
-    })
-  })
-})
+createSprite('mouse-pointer', mouseLogic)
 
 /* event functions */
 
@@ -704,24 +439,6 @@ function subscribe (name, code, sprite, data) {
   } else {
     events[name] = [{ sprite: sprite, code: code, data: data }]
   }
-}
-
-/* draw functions */
-
-function fill (color) {
-  context.fillStyle = color
-}
-
-function rect (x, y, w, h = w) {
-  context.fillRect(x * sc, y * sc, w * sc, h * sc)
-}
-
-function font (size, font) {
-  context.font = `${size * sc}px ${font}`
-}
-
-function text (text, x, y) {
-  context.fillText(text, x * sc, y * sc)
 }
 
 /* global functions */

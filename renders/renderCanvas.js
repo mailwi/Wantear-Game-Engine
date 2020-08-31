@@ -1,108 +1,38 @@
-/* Collision classes */
-
-class CollisionShape {
-  constructor () {
-    this.collidingShapes = {}
-  }
-
-  reset () {
-    this.collidingShapes = {}
-  }
-
-  addCollidingShape (name, shape) {
-    if (name in this.collidingShapes) {
-      this.collidingShapes[name].push(shape)
-    } else {
-      this.collidingShapes[name] = [shape]
-    }
-  }
-
-  colliding () {
-    if (Object.keys(this.collidingShapes).length > 0) {
-      return true
-    }
-    return false
-  }
-
-  pointRect (px, py, rx, ry, rw, rh) {
-    if (px >= rx && px <= rx + rw && py >= ry && py <= ry + rh) {
-      return true
-    }
-    return false
-  }
-
-  rectRect (r1x, r1y, r1w, r1h, r2x, r2y, r2w, r2h) {
-    if (r1x + r1w >= r2x && r1x <= r2x + r2w && r1y + r1h >= r2y && r1y <= r2y + r2h) {
-      return true
-    }
-    return false
-  }
-}
-
-class CollisionPoint extends CollisionShape {
-  constructor (sprite, x, y) {
-    super()
-    this.sprite = sprite
-    this.x = x
-    this.y = y
-  }
-
-  eval (collisionShape) {
-    if (collisionShape instanceof CollisionRect) {
-      if (this.pointRect(this.sprite.x + this.x, this.sprite.y + this.y,
-        collisionShape.sprite.x + collisionShape.x,
-        collisionShape.sprite.y + collisionShape.y,
-        collisionShape.w, collisionShape.h)) {
-        this.addCollidingShape(collisionShape.sprite.name, collisionShape)
-        collisionShape.addCollidingShape(this.sprite.name, this)
-      }
-    }
-  }
-}
-
-class CollisionRect extends CollisionShape {
-  constructor (sprite, x, y, w, h) {
-    super()
-    this.sprite = sprite
-    this.x = x
-    this.y = y
-    this.w = w
-    this.h = h
-  }
-
-  eval (collisionShape) {
-    if (collisionShape instanceof CollisionPoint) {
-      if (this.pointRect(collisionShape.sprite.x + collisionShape.x, collisionShape.sprite.y + collisionShape.y,
-        this.sprite.x + this.x,
-        this.sprite.y + this.y,
-        this.w, this.h)) {
-        this.addCollidingShape(collisionShape.sprite.name, collisionShape)
-        collisionShape.addCollidingShape(this.sprite.name, this)
-      }
-    } else if (collisionShape instanceof CollisionRect) {
-      if (this.rectRect(this.sprite.x + this.x, this.sprite.y + this.y, this.w, this.h,
-        collisionShape.sprite.x + collisionShape.x,
-        collisionShape.sprite.y + collisionShape.y,
-        collisionShape.w, collisionShape.h)) {
-        this.addCollidingShape(collisionShape.sprite.name, collisionShape)
-        collisionShape.addCollidingShape(this.sprite.name, this)
-      }
-    }
-  }
-}
-
 /* Render class */
+
+const displayWidth = 1280
+const displayHeight = 720
+const rc = displayHeight / displayWidth
 
 const layersNeedLogic = true
 const collisionsNeedLogic = true
 const is2D = true
 
-let seeCollisions
-
 class Render {
   constructor () {
-    seeCollisions = false
+    this.seeCollisions = false
+    this.sc = 1
+    this.layers = []
+    this.layerIndex = 0
+    this.collisionShapes = []
+    this.canvas = null
+    this.prerenderCanvas = null
 
+    this.strokeStyle = '#000'
+    this.fillStyle = '#000'
+
+    this.delay = null
+    this.oldTimeStamp = null
+    this.fps = null
+
+    this.gameLoopFunc = null
+
+    this.engine = null
+
+    this.init()
+  }
+
+  init () {
     document.documentElement.style.height = '100%'
     document.body.style.height = '100%'
     document.body.style.backgroundColor = 'black'
@@ -129,31 +59,40 @@ class Render {
       this.resize()
     }
 
-    this.sc = 1
-    this.layers = []
-    this.layerIndex = 0
-    this.collisionShapes = []
-
-    this.canvas.addEventListener('mousedown', e => {
-      mouseDown = true
-      mouseX = Math.round(e.offsetX / this.sc)
-      mouseY = Math.round(e.offsetY / this.sc)
-    })
-
-    this.canvas.addEventListener('mousemove', e => {
-      mouseX = Math.round(e.offsetX / this.sc)
-      mouseY = Math.round(e.offsetY / this.sc)
-    })
-
-    this.canvas.addEventListener('mouseup', e => {
-      mouseDown = false
-      mouseX = Math.round(e.offsetX / this.sc)
-      mouseY = Math.round(e.offsetY / this.sc)
-    })
-
     window.addEventListener('load', () => {
       this.resize()
     })
+  }
+
+  engineInit (engine) {
+    this.engine = engine
+
+    window.onresize = () => {
+      this.resize()
+    }
+
+    this.canvas.addEventListener('mousedown', e => {
+      engine.mouseDown = true
+      engine.mouseX = Math.round(e.offsetX / this.sc)
+      engine.mouseY = Math.round(e.offsetY / this.sc)
+    })
+
+    this.canvas.addEventListener('mousemove', e => {
+      engine.mouseX = Math.round(e.offsetX / this.sc)
+      engine.mouseY = Math.round(e.offsetY / this.sc)
+    })
+
+    this.canvas.addEventListener('mouseup', e => {
+      engine.mouseDown = false
+      engine.mouseX = Math.round(e.offsetX / this.sc)
+      engine.mouseY = Math.round(e.offsetY / this.sc)
+    })
+
+    this.oldTimeStamp = Date.now()
+    this.gameLoopFunc = () => {
+      this.gameLoop()
+    }
+    window.requestAnimationFrame(this.gameLoopFunc)
   }
 
   resize () {
@@ -175,13 +114,101 @@ class Render {
     }
   }
 
+  gameLoop () {
+    const timeStamp = Date.now()
+
+    this.delay = (timeStamp - this.oldTimeStamp) / 1000
+    this.oldTimeStamp = timeStamp
+
+    this.fps = Math.round(1 / this.delay)
+
+    if (this.engine.countToTrash > 50) {
+      this.layersToTrash()
+      this.collisionsToTrash()
+    }
+
+    this.collisionsLoop()
+
+    this.engine.gameLoop()
+
+    this.clear()
+    this.layersLoop()
+    this.drawCollisions()
+
+    window.requestAnimationFrame(this.gameLoopFunc)
+  }
+
+  /* draw functions */
+
   clear () {
     this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
   }
 
+  fill (color) {
+    this.context.fillStyle = color
+    this.fillStyle = color
+  }
+
+  stroke (color) {
+    this.context.strokeStyle = color
+    this.strokeStyle = color
+  }
+
+  noFill () {
+    this.fillStyle = ''
+  }
+
+  noStroke () {
+    this.strokeStyle = ''
+  }
+
+  push () {
+    this.context.save()
+  }
+
+  pop () {
+    this.context.restore()
+  }
+
+  translate (x, y) {
+    this.context.translate(x * this.sc, y * this.sc)
+  }
+
+  rotate (radians) {
+    this.context.rotate(radians)
+  }
+
+  rotateDegree (degree) {
+    this.context.rotate(degree * Math.PI / 180)
+  }
+
+  rect (x, y, w, h = w) {
+    if (this.fillStyle !== '') {
+      this.context.fillRect(x * this.sc, y * this.sc, w * this.sc, h * this.sc)
+    }
+
+    if (this.strokeStyle !== '') {
+      this.context.strokeRect(x * this.sc, y * this.sc, w * this.sc, h * this.sc)
+    }
+  }
+
+  font (size, font) {
+    this.context.font = `${size * this.sc}px ${font}`
+  }
+
+  text (text, x, y) {
+    if (this.fillStyle !== '') {
+      this.context.fillText(text, x * this.sc, y * this.sc)
+    }
+
+    if (this.strokeStyle !== '') {
+      this.context.strokeText(text, x * this.sc, y * this.sc)
+    }
+  }
+
   /* costume functions */
 
-  async addCostumes (sprite, images) {
+  async _addCostumes (sprite, images) {
     function getImage (data) {
       return new Promise((resolve) => {
         const image = new Image()
@@ -206,6 +233,12 @@ class Render {
         sprite.currentCostumeNumber = i + 1
         sprite.currentCostumeData = image
       }
+    }
+  }
+
+  addCostumes (sprite, costumesData) {
+    if (!sprite.clone) {
+      sprite.costumesLoaded = this._addCostumes(sprite, costumesData)
     }
   }
 
@@ -299,11 +332,22 @@ class Render {
 
   /* collision functions */
 
+  collisionPoint (sprite, x, y) {
+    sprite.collisionShape = new CollisionPoint(sprite, x, y)
+    this.collisionShapes.push(sprite.collisionShape)
+  }
+
+  collisionRect (sprite, x, y, w, h) {
+    sprite.collisionShape = new CollisionRect(sprite, x, y, w, h)
+    this.collisionShapes.push(sprite.collisionShape)
+  }
+
   collisionsToTrash () {
     this.collisionShapes = this.collisionShapes.filter(collisionShape => collisionShape !== null)
   }
 
   deleteFromCollisions (sprite) {
+    console.log('>', sprite.collisionShape)
     sprite.collisionShape.sprite = null
     const indexShape = this.collisionShapes.indexOf(sprite.collisionShape)
     this.collisionShapes[indexShape] = null
@@ -323,15 +367,15 @@ class Render {
   }
 
   drawCollisions () {
-    if (seeCollisions) {
+    if (this.seeCollisions) {
       for (let i = 0; i < this.collisionShapes.length; i++) {
-        fill('rgba(255, 0, 0, 0.25)')
+        this.fill('rgba(255, 0, 0, 0.25)')
 
         const collisionShape = this.collisionShapes[i]
         if (collisionShape instanceof CollisionRect) {
-          rect(collisionShape.sprite.x + collisionShape.x, collisionShape.sprite.y + collisionShape.y, collisionShape.w, collisionShape.h)
+          this.rect(collisionShape.sprite.x + collisionShape.x, collisionShape.sprite.y + collisionShape.y, collisionShape.w, collisionShape.h)
         } else if (collisionShape instanceof CollisionPoint) {
-          rect(collisionShape.sprite.x + collisionShape.x - 2, collisionShape.sprite.y + collisionShape.y - 2, 4, 4)
+          this.rect(collisionShape.sprite.x + collisionShape.x - 2, collisionShape.sprite.y + collisionShape.y - 2, 4, 4)
         }
       }
     }
@@ -344,78 +388,125 @@ class Render {
     return false
   }
 
-  /* draw functions */
+  /* mouse */
 
-  fill (color) {
-    this.context.fillStyle = color
-  }
+  mouseLogic () {
+    R.collisionPoint(this, 0, 0)
 
-  rect (x, y, w, h = w) {
-    this.context.fillRect(x * this.sc, y * this.sc, w * this.sc, h * this.sc)
-  }
-
-  font (size, font) {
-    this.context.font = `${size * this.sc}px ${font}`
-  }
-
-  text (text, x, y) {
-    this.context.fillText(text, x * this.sc, y * this.sc)
-  }
-}
-
-const render = new Render()
-
-function mouseLogic () {
-  collisionPoint(this, 0, 0)
-
-  this.whenGameStart(() => {
-    render.canvas.addEventListener('mouseup', _ => {
-      if (this.collisionShape.colliding()) {
-        const collidingShapes = this.collisionShape.collidingShapes
-        for (const name in collidingShapes) {
-          const shapes = collidingShapes[name]
-          for (let i = 0; i < shapes.length; i++) {
-            const sprite = shapes[i].sprite
-            if (sprite.whenThisSpriteClickedEvent) {
-              sprite.whenThisSpriteClickedEvent()
+    E.whenGameStart(this, () => {
+      R.canvas.addEventListener('mouseup', _ => {
+        if (this.collisionShape.colliding()) {
+          const collidingShapes = this.collisionShape.collidingShapes
+          for (const name in collidingShapes) {
+            const shapes = collidingShapes[name]
+            for (let i = 0; i < shapes.length; i++) {
+              const sprite = shapes[i].sprite
+              if (sprite.whenThisSpriteClickedEvent) {
+                sprite.whenThisSpriteClickedEvent()
+              }
             }
           }
         }
+      })
+
+      E.forever(this, () => {
+        this.goto(E.mouseX, E.mouseY)
+      })
+    })
+  }
+}
+
+/* Collision classes */
+
+class CollisionShape {
+  constructor () {
+    this.collidingShapes = {}
+  }
+
+  reset () {
+    this.collidingShapes = {}
+  }
+
+  addCollidingShape (name, shape) {
+    if (name in this.collidingShapes) {
+      this.collidingShapes[name].push(shape)
+    } else {
+      this.collidingShapes[name] = [shape]
+    }
+  }
+
+  colliding () {
+    if (Object.keys(this.collidingShapes).length > 0) {
+      return true
+    }
+    return false
+  }
+
+  pointRect (px, py, rx, ry, rw, rh) {
+    if (px >= rx && px <= rx + rw && py >= ry && py <= ry + rh) {
+      return true
+    }
+    return false
+  }
+
+  rectRect (r1x, r1y, r1w, r1h, r2x, r2y, r2w, r2h) {
+    if (r1x + r1w >= r2x && r1x <= r2x + r2w && r1y + r1h >= r2y && r1y <= r2y + r2h) {
+      return true
+    }
+    return false
+  }
+}
+
+class CollisionPoint extends CollisionShape {
+  constructor (sprite, x, y) {
+    super()
+    this.sprite = sprite
+    this.x = x
+    this.y = y
+  }
+
+  eval (collisionShape) {
+    if (collisionShape instanceof CollisionRect) {
+      if (this.pointRect(this.sprite.x + this.x, this.sprite.y + this.y,
+        collisionShape.sprite.x + collisionShape.x,
+        collisionShape.sprite.y + collisionShape.y,
+        collisionShape.w, collisionShape.h)) {
+        this.addCollidingShape(collisionShape.sprite.name, collisionShape)
+        collisionShape.addCollidingShape(this.sprite.name, this)
       }
-    })
-
-    this.forever(() => {
-      this.goto(mouseX, mouseY)
-    })
-  })
+    }
+  }
 }
 
-/* collision functions */
+class CollisionRect extends CollisionShape {
+  constructor (sprite, x, y, w, h) {
+    super()
+    this.sprite = sprite
+    this.x = x
+    this.y = y
+    this.w = w
+    this.h = h
+  }
 
-function collisionPoint (sprite, x, y) {
-  sprite.collisionShape = new CollisionPoint(sprite, x, y)
-  render.collisionShapes.push(sprite.collisionShape)
+  eval (collisionShape) {
+    if (collisionShape instanceof CollisionPoint) {
+      if (this.pointRect(collisionShape.sprite.x + collisionShape.x, collisionShape.sprite.y + collisionShape.y,
+        this.sprite.x + this.x,
+        this.sprite.y + this.y,
+        this.w, this.h)) {
+        this.addCollidingShape(collisionShape.sprite.name, collisionShape)
+        collisionShape.addCollidingShape(this.sprite.name, this)
+      }
+    } else if (collisionShape instanceof CollisionRect) {
+      if (this.rectRect(this.sprite.x + this.x, this.sprite.y + this.y, this.w, this.h,
+        collisionShape.sprite.x + collisionShape.x,
+        collisionShape.sprite.y + collisionShape.y,
+        collisionShape.w, collisionShape.h)) {
+        this.addCollidingShape(collisionShape.sprite.name, collisionShape)
+        collisionShape.addCollidingShape(this.sprite.name, this)
+      }
+    }
+  }
 }
 
-function collisionRect (sprite, x, y, w, h) {
-  sprite.collisionShape = new CollisionRect(sprite, x, y, w, h)
-  render.collisionShapes.push(sprite.collisionShape)
-}
-
-/* draw functions */
-
-function fill (color) {
-  render.fill(color)
-}
-
-function rect (x, y, w, h = w) {
-  render.rect(x, y, w, h)
-}
-
-function font (size, font) {
-  render.font(size, font)
-}
-
-function text (text, x, y) {
-  render.text(text, x, y)
-}
+const R = new Render()

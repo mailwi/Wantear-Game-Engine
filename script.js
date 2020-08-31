@@ -1,5 +1,5 @@
-function setup () {
-  seeCollisions = true
+setup(function () {
+  R.seeCollisions = true
 
   const obj = {
     score: 0,
@@ -9,14 +9,14 @@ function setup () {
   }
 
   createSprite('Player', function () {
-    this.addCostumes([
+    addCostumes(this, [
       { name: 'idle', data: 'images/platformChar_idle.png' },
       { name: 'walk1', data: 'images/platformChar_walk1.png' },
       { name: 'walk2', data: 'images/platformChar_walk2.png' }
     ])
 
-    this.addSounds({
-      // music: 'sounds/hero.mp3',
+    addSounds(this, {
+      music: 'sounds/hero.mp3',
       shoot: 'sounds/bow.ogg'
     })
 
@@ -25,19 +25,20 @@ function setup () {
     this.set('animation', 0)
     this.set('move', false)
 
-    this.whenGameStart(async () => {
+    whenGameStart(this, async () => {
+      await this.costumesLoaded
       await this.soundsLoaded
-      // this.startSound('music')
-      // this.setVolumeTo('music', 0.25)
+      // A.startSound(this, 'music')
+      // A.setVolumeTo(this, 'music', 0.25)
 
       this.goto(100, 100)
 
-      this.forever(() => {
+      forever(this, () => {
         this.set('move', false)
 
         if (keyPressed('KeyW')) {
           // this.mirror(true)
-          this.y -= delay * 150
+          this.y -= R.delay * 150
           obj.py = this.y + 25
           this.set('animation', 1)
           this.set('move', true)
@@ -45,7 +46,7 @@ function setup () {
 
         if (keyPressed('KeyS')) {
           // this.mirror(false)
-          this.y += delay * 150
+          this.y += R.delay * 150
           obj.py = this.y + 25
           this.set('animation', 1)
           this.set('move', true)
@@ -58,9 +59,15 @@ function setup () {
         }
       })
 
-      this.foreverWait(async () => {
-        await this.costumesLoaded
+      whenKeyPressed(this, 'Space', () => {
+        // await this.playSoundUntilDone('shoot', true)
+        obj.px = this.x + 25
+        obj.py = this.y + 25
+        createCloneOf('Bullet')
+        startSound(this, 'shoot', true)
+      })
 
+      foreverWait(this, async () => {
         const animation = this.get('animation')
         switch (animation) {
           case 0:
@@ -68,7 +75,7 @@ function setup () {
             break
           case 1:
             this.switchCostumeTo('walk1')
-            await this.repeatUntil(() => this.get('animation') !== 1, async () => {
+            await repeatUntil(() => this.get('animation') !== 1, async () => {
               await waitSeconds(0.25)
               if (this.currentCostume !== 'walk2') {
                 this.nextCostume()
@@ -79,54 +86,41 @@ function setup () {
             break
         }
 
-        this.goToFrontLayer()
+        goToFrontLayer(this)
       })
     })
 
     this.draw(() => {
-      this.drawCostume()
+      drawCostume(this)
 
       fill('black')
       font('25', 'Arial')
-      text(fps + ' ' + obj.enemySpeed, 50, 50)
+      text(R.fps + ' ' + obj.enemySpeed, 50, 50)
       text('Score: ' + obj.score, 50, 75)
-    })
-
-    this.whenKeyPressed('Space', async () => {
-      // await this.playSoundUntilDone('shoot', true)
-      obj.px = this.x + 25
-      obj.py = this.y + 25
-      this.createCloneOf('Bullet')
-      this.startSound('shoot', true)
-    })
-
-    this.whenKeyPressed('keyY', () => {
-      obj.px = this.x + 25
-      obj.py = this.y + 25
-      this.createCloneOf('Bullet')
-      this.startSound('shoot', true)
     })
   })
 
   createSprite('Bullet', function () {
-    this.addCostumes([
+    addCostumes(this, [
       { name: 'shoot', data: 'images/shoot.png' }
     ])
 
     collisionRect(this, 25, 25, 10, 10)
 
-    this.whenGameStart(() => {
+    whenGameStart(this, async () => {
+      await this.costumesLoaded
       this.goto(-100, -100)
     })
 
     this.whenIStartAsAClone(() => {
       this.goto(obj.px, obj.py)
 
-      this.forever(() => {
-        this.x += delay * 300
+      forever(this, () => {
+        this.x += R.delay * 300
 
-        if (this.touching('Enemy') || this.x > 1280) {
-          this.deleteThisClone()
+        if (touching(this, 'Enemy') || this.x > 1280) {
+          console.log('collision')
+          deleteThisClone(this)
         }
       })
     })
@@ -134,18 +128,18 @@ function setup () {
     this.draw(() => {
       // fill('red')
       // rect(this.x - 5, this.y - 5, 10, 10)
-      this.drawCostume()
+      drawCostume(this)
     })
   })
 
   createSprite('Enemy', function () {
     collisionRect(this, -25, -25, 50, 50)
 
-    this.whenGameStart(() => {
+    whenGameStart(this, () => {
       this.goto(-100, -100)
 
-      this.foreverWait(async () => {
-        this.createCloneOfMySelf()
+      foreverWait(this, async () => {
+        createCloneOfMySelf(this)
         let seconds = 1 - obj.enemySpeed / 25
         if (seconds < 0.25) seconds = 0.25
         obj.enemySpeed += 0.25
@@ -156,21 +150,25 @@ function setup () {
     this.whenIStartAsAClone(() => {
       this.goto(Math.random() * 300 + 900, Math.random() * 600 + 100)
 
-      this.forever(() => {
-        this.x -= delay * (150 + obj.enemySpeed * 5)
+      forever(this, () => {
+        this.x -= R.delay * (150 + obj.enemySpeed * 5)
 
-        if (this.touching('Bullet')) {
+        if (touching(this, 'Bullet')) {
           obj.score++
-          this.deleteThisClone()
+          deleteThisClone(this)
         } else if (this.x < 0) {
-          this.deleteThisClone()
+          deleteThisClone(this)
         }
       })
 
       this.draw(() => {
         fill('green')
-        rect(this.x - 25, this.y - 25, 50, 50)
+        translate(this.x - 25, this.y - 25)
+        rotate(0.05)
+        rect(0, 0, 50, 50)
+        rotate(-0.05)
+        translate(-this.x + 25, -this.y + 25)
       })
     })
   })
-}
+})

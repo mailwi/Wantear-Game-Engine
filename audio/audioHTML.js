@@ -71,4 +71,4 @@ class AudioEngine {
   }
 }
 
-const audioEngine = new AudioEngine()
+const A = new AudioEngine()

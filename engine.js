@@ -1,110 +1,237 @@
-const displayWidth = 1280
-const displayHeight = 720
-const rc = displayHeight / displayWidth
-let delay
-let oldTimeStamp
-let fps
-let mouseDown
-let mouseX
-let mouseY
-const keyCodes = {}
+class Engine {
+  constructor (render, audioEngine) {
+    this.render = render
+    this.audioEngine = audioEngine
 
-let countToTrash = 0
+    this.mouseDown = null
+    this.mouseX = null
+    this.mouseY = null
 
-const events = {}
+    this.keyCodes = {}
 
-window.onload = init
+    this.countToTrash = 0
 
-function init () {
-  mouseDown = false
+    this.events = {}
 
-  document.addEventListener('keydown', e => {
-    keyCodes[e.code] = true
-  })
+    this.sprites = {}
+    this.clones = {}
 
-  document.addEventListener('keyup', e => {
-    keyCodes[e.code] = false
+    this.setupFunc = null
 
-    if ('whenKeyPressed' in events) {
-      const whenKeyPressedEvent = events.whenKeyPressed
-      for (let i = 0; i < whenKeyPressedEvent.length; i++) {
-        if (whenKeyPressedEvent[i] && whenKeyPressedEvent[i].data === e.code) whenKeyPressedEvent[i].code()
+    this.init()
+  }
+
+  init () {
+    window.onload = () => {
+      this.load()
+    }
+  }
+
+  setup (f) {
+    this.setupFunc = f
+  }
+
+  async load () {
+    this.mouseDown = false
+
+    document.addEventListener('keydown', e => {
+      this.keyCodes[e.code] = true
+    })
+
+    document.addEventListener('keyup', e => {
+      this.keyCodes[e.code] = false
+
+      if ('whenKeyPressed' in this.events) {
+        const whenKeyPressedEvent = this.events.whenKeyPressed
+        for (let i = 0; i < whenKeyPressedEvent.length; i++) {
+          if (whenKeyPressedEvent[i] && whenKeyPressedEvent[i].data === e.code) whenKeyPressedEvent[i].code()
+        }
+      }
+    })
+
+    this.createSprite('mouse-pointer', this.render.mouseLogic)
+
+    this.setupFunc()
+
+    for (const spriteName in this.sprites) {
+      this.sprites[spriteName].setup()
+    }
+
+    if ('whenGameStart' in this.events) {
+      const whenGameStartEvent = this.events.whenGameStart
+      for (let i = 0; i < whenGameStartEvent.length; i++) {
+        if (whenGameStartEvent[i]) await whenGameStartEvent[i].code()
       }
     }
-  })
 
-  setup()
-
-  for (spriteName in sprites) {
-    sprites[spriteName].setup()
+    this.render.engineInit(this)
   }
 
-  if ('whenGameStart' in events) {
-    const whenGameStartEvent = events.whenGameStart
-    for (let i = 0; i < whenGameStartEvent.length; i++) {
-      if (whenGameStartEvent[i]) whenGameStartEvent[i].code()
-    }
-  }
+  gameLoop () {
+    if (this.countToTrash > 50) {
+      for (const name in this.events) {
+        const event = this.events[name]
+        this.events[name] = event.filter(sprite => sprite !== null)
+      }
 
-  oldTimeStamp = Date.now()
-  window.requestAnimationFrame(gameLoop)
-}
+      for (const name in this.clones) {
+        const sprites = this.clones[name]
+        this.clones[name] = sprites.filter(sprite => sprite !== null)
+      }
 
-function gameLoop () {
-  const timeStamp = Date.now()
-
-  delay = (timeStamp - oldTimeStamp) / 1000
-  oldTimeStamp = timeStamp
-
-  fps = Math.round(1 / delay)
-
-  if (countToTrash > 50) {
-    for (const name in events) {
-      const event = events[name]
-      events[name] = event.filter(sprite => sprite !== null)
+      this.countToTrash = 0
     }
 
-    for (const name in clones) {
-      const sprites = clones[name]
-      clones[name] = sprites.filter(sprite => sprite !== null)
+    if ('forever' in this.events) {
+      const foreverEvent = this.events.forever
+      for (let i = 0; i < foreverEvent.length; i++) {
+        if (foreverEvent[i]) foreverEvent[i].code()
+      }
     }
 
-    if (layersNeedLogic) render.layersToTrash()
-
-    if (collisionsNeedLogic) render.collisionsToTrash()
-
-    countToTrash = 0
-  }
-
-  if (collisionsNeedLogic) render.collisionsLoop()
-
-  if ('forever' in events) {
-    const foreverEvent = events.forever
-    for (let i = 0; i < foreverEvent.length; i++) {
-      if (foreverEvent[i]) foreverEvent[i].code()
-    }
-  }
-
-  if ('foreverWait' in events) {
-    const foreverWaitEvent = events.foreverWait
-    for (let i = 0; i < foreverWaitEvent.length; i++) {
-      if (!foreverWaitEvent[i].wait) {
-        foreverWaitEvent[i].wait = true
-        foreverWaitEvent[i].code().then(() => {
-          foreverWaitEvent[i].wait = false
-          return true
-        })
+    if ('foreverWait' in this.events) {
+      const foreverWaitEvent = this.events.foreverWait
+      for (let i = 0; i < foreverWaitEvent.length; i++) {
+        if (!foreverWaitEvent[i].wait) {
+          foreverWaitEvent[i].wait = true
+          foreverWaitEvent[i].code().then(() => {
+            foreverWaitEvent[i].wait = false
+            return true
+          })
+        }
       }
     }
   }
 
-  render.clear()
+  createSprite (name, code) {
+    const sprite = new Sprite(name, code)
+    this.sprites[name] = sprite
+    this.render.layersAdd(sprite)
+  }
 
-  render.layersLoop()
+  /* event functions */
 
-  if (collisionsNeedLogic) render.drawCollisions()
+  unsubscribe (name, sprite, index = null) {
+    if (name in this.events) {
+      if (index) {
+        this.events[name][index] = null
+        this.countToTrash++
+      } else {
+        index = this.events[name].findIndex((spriteData) => spriteData.sprite === sprite)
+        this.events[name][index] = null
+        this.countToTrash++
+      }
+    }
+  }
 
-  window.requestAnimationFrame(gameLoop)
+  subscribe (name, code, sprite, data) {
+    if (name in this.events) {
+      this.events[name].push({ sprite: sprite, code: code, data: data })
+    } else {
+      this.events[name] = [{ sprite: sprite, code: code, data: data }]
+    }
+  }
+
+  /* sprite functions */
+
+  waitSeconds (seconds) {
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(), seconds * 1000)
+    })
+  }
+
+  keyPressed (keyCode) {
+    if (this.keyCodes[keyCode]) {
+      return true
+    }
+    return false
+  }
+
+  /* clone functions */
+
+  createCloneOf (name) {
+    const sprite = this.sprites[name]
+    const clone = new Sprite(name, sprite.code)
+    clone.x = sprite.x
+    clone.y = sprite.y
+    clone.size = sprite.size
+    clone.layer = sprite.layer
+    clone.local = Object.assign({}, sprite.local)
+    clone.costumes = Object.assign({}, sprite.costumes)
+    clone.costumesOrder = Object.assign([], sprite.costumesOrder)
+    clone.currentCostume = sprite.currentCostume
+    clone.currentCostumeNumber = sprite.currentCostumeNumber
+    clone.currentCostumeData = sprite.currentCostumeData
+    clone.costumesLoaded = true
+
+    this.render.layersOnlyAdd(clone)
+
+    if (name in this.clones) {
+      this.clones[name].push(clone)
+    } else {
+      this.clones[name] = [clone]
+    }
+
+    clone.clone = true
+    clone.setup()
+    clone.whenIStartAsACloneEvent()
+  }
+
+  createCloneOfMySelf (sprite) {
+    this.createCloneOf(sprite.name)
+  }
+
+  deleteThisClone (sprite) {
+    if (sprite.clone) {
+      const spriteClones = this.clones[sprite.name]
+      const index = spriteClones.indexOf(this)
+      spriteClones[index] = null
+
+      for (const key in this.events) {
+        const sprites = this.events[key]
+        const index = sprites.findIndex((spriteData) => spriteData && spriteData.sprite === sprite)
+        if (index !== -1) {
+          sprites[index] = null
+        }
+      }
+
+      if (layersNeedLogic) this.render.deleteFromLayers(sprite)
+      if (collisionsNeedLogic) this.render.deleteFromCollisions(sprite)
+
+      this.countToTrash++
+    }
+  }
+
+  /* event functions */
+
+  whenGameStart (sprite, code) {
+    this.subscribe('whenGameStart', code, sprite)
+  }
+
+  forever (sprite, code) {
+    this.subscribe('forever', code, sprite)
+  }
+
+  foreverWait (sprite, code) {
+    this.subscribe('foreverWait', code, sprite)
+  }
+
+  repeatUntil (condition, code) {
+    const repeatFunc = async (resolve) => {
+      if (!condition()) {
+        await code()
+        setTimeout(() => repeatFunc(resolve), 1)
+      } else {
+        resolve()
+      }
+    }
+
+    return new Promise(repeatFunc)
+  }
+
+  whenKeyPressed (sprite, keyCode, code) {
+    this.subscribe('whenKeyPressed', code, sprite, keyCode)
+  }
 }
 
 /* Sprite system */
@@ -117,6 +244,7 @@ class Sprite {
     this.y = 0
     this.z = 0
     this.size = 1
+    this.direction = 0
     this.layer = null
     this.drawSprite = null
     this.local = {}
@@ -133,7 +261,7 @@ class Sprite {
     this.sounds = {}
     this.soundsLoaded = null
 
-    if (collisionsNeedLogic) this.collisionShape = null
+    this.collisionShape = null
     this.whenThisSpriteClickedEvent = null
     this.whenIStartAsACloneEvent = null
 
@@ -145,44 +273,8 @@ class Sprite {
     this.y = y
   }
 
-  touching (name) {
-    return render.touching(this, name)
-  }
-
   whenThisSpriteClicked (code) {
     this.whenThisSpriteClickedEvent = code
-  }
-
-  createCloneOf (name) {
-    const sprite = sprites[name]
-    const clone = new Sprite(name, sprite.code)
-    clone.x = sprite.x
-    clone.y = sprite.y
-    clone.size = sprite.size
-    clone.layer = sprite.layer
-    clone.local = Object.assign({}, sprite.local)
-    clone.costumes = Object.assign({}, sprite.costumes)
-    clone.costumesOrder = Object.assign([], sprite.costumesOrder)
-    clone.currentCostume = sprite.currentCostume
-    clone.currentCostumeNumber = sprite.currentCostumeNumber
-    clone.currentCostumeData = sprite.currentCostumeData
-    clone.costumesLoaded = true
-
-    render.layersOnlyAdd(clone)
-
-    if (name in clones) {
-      clones[name].push(clone)
-    } else {
-      clones[name] = [clone]
-    }
-
-    clone.clone = true
-    clone.setup()
-    clone.whenIStartAsACloneEvent()
-  }
-
-  createCloneOfMySelf () {
-    this.createCloneOf(this.name)
   }
 
   whenIStartAsAClone (code) {
@@ -198,18 +290,6 @@ class Sprite {
   }
 
   /* costume functions */
-
-  addCostumes (costumesData) {
-    if (!this.clone) {
-      this.costumesLoaded = render.addCostumes(this, costumesData)
-    }
-  }
-
-  drawCostume () {
-    if (this.currentCostumeData && this.show) {
-      render.drawCostume(this)
-    }
-  }
 
   nextCostume () {
     this.currentCostumeNumber++
@@ -244,175 +324,13 @@ class Sprite {
     this.show = false
   }
 
-  /* layer functions */
-
-  goToBackLayer () {
-    render.goToBackLayer(this)
-  }
-
-  goToFrontLayer () {
-    render.goToFrontLayer(this)
-  }
-
-  goBackwardLayers (goValue) {
-    render.goBackwardLayers(this, goValue)
-  }
-
-  goForwardLayers (goValue) {
-    render.goForwardLayers(this, goValue)
-  }
-
-  setLayer (value) {
-    render.setLayer(this, value)
-  }
-
-  /* sound functions */
-
-  addSounds (sounds) {
-    this.soundsLoaded = audioEngine.addSounds(this, sounds)
-  }
-
-  async playSoundUntilDone (name, instanceSound = false) {
-    await audioEngine.playSoundUntilDone(this, name, instanceSound)
-  }
-
-  startSound (name, instanceSound = false) {
-    audioEngine.startSound(this, name, instanceSound)
-  }
-
-  pauseSound (name) {
-    audioEngine.pauseSound(this, name)
-  }
-
-  stopSound (name) {
-    audioEngine.stopSound(this, name)
-  }
-
-  changeVolumeBy (name, value) {
-    audioEngine.changeVolumeBy(this, name, value)
-  }
-
-  setVolumeTo (name, value) {
-    audioEngine.setVolumeTo(this, name, value)
-  }
-
-  getVolume (name) {
-    audioEngine.getVolume(this, name)
-  }
-
-  getSound (name) {
-    audioEngine.getSound(this, name)
-  }
-
-  /* sound functions */
-
   draw (code) {
     this.drawSprite = code
-  }
-
-  deleteThisClone () {
-    if (this.clone) {
-      const spriteClones = clones[this.name]
-      const index = spriteClones.indexOf(this)
-      spriteClones[index] = null
-
-      for (const key in events) {
-        const sprites = events[key]
-        const index = sprites.findIndex((spriteData) => spriteData && spriteData.sprite === this)
-        if (index !== -1) {
-          sprites[index] = null
-        }
-      }
-
-      if (layersNeedLogic) render.deleteFromLayers(this)
-
-      if (collisionsNeedLogic) render.deleteFromCollisions(this)
-
-      countToTrash++
-    }
   }
 
   setup () {
     this.code()
   }
-
-  /* event functions */
-
-  whenGameStart (code) {
-    subscribe('whenGameStart', code, this)
-  }
-
-  forever (code) {
-    subscribe('forever', code, this)
-  }
-
-  foreverWait (code) {
-    subscribe('foreverWait', code, this)
-  }
-
-  repeatUntil (condition, code) {
-    const repeatFunc = async (resolve) => {
-      if (!condition()) {
-        await code()
-        setTimeout(() => repeatFunc(resolve), 1)
-      } else {
-        resolve()
-      }
-    }
-
-    return new Promise(repeatFunc)
-  }
-
-  whenKeyPressed (keyCode, code) {
-    subscribe('whenKeyPressed', code, this, keyCode)
-  }
 }
 
-const sprites = {}
-const clones = {}
-
-function createSprite (name, code) {
-  const sprite = new Sprite(name, code)
-  sprites[name] = sprite
-  render.layersAdd(sprite)
-}
-
-createSprite('mouse-pointer', mouseLogic)
-
-/* event functions */
-
-function unsubscribe (name, sprite, index = null) {
-  if (name in events) {
-    if (index) {
-      events[name][index] = null
-      countToTrash++
-    } else {
-      index = events[name].findIndex((spriteData) => spriteData.sprite === sprite)
-      events[name][index] = null
-      countToTrash++
-    }
-  }
-}
-
-function subscribe (name, code, sprite, data) {
-  if (name in events) {
-    events[name].push({ sprite: sprite, code: code, data: data })
-  } else {
-    events[name] = [{ sprite: sprite, code: code, data: data }]
-  }
-}
-
-/* global functions */
-
-function waitSeconds (seconds) {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(), seconds * 1000)
-  })
-}
-
-function keyPressed (keyCode) {
-  if (keyCodes[keyCode]) {
-    return true
-  }
-  return false
-}
+const E = new Engine(R, A)

@@ -347,7 +347,6 @@ class Render {
   }
 
   deleteFromCollisions (sprite) {
-    console.log('>', sprite.collisionShape)
     sprite.collisionShape.sprite = null
     const indexShape = this.collisionShapes.indexOf(sprite.collisionShape)
     this.collisionShapes[indexShape] = null

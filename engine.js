@@ -149,7 +149,8 @@ class Engine {
 
   /* clone functions */
 
-  createCloneOf (name) {
+  createCloneOf (caller, name) {
+    if (caller.clone) return
     const sprite = this.sprites[name]
     const clone = new Sprite(name, sprite.code)
     clone.x = sprite.x
@@ -162,7 +163,9 @@ class Engine {
     clone.currentCostume = sprite.currentCostume
     clone.currentCostumeNumber = sprite.currentCostumeNumber
     clone.currentCostumeData = sprite.currentCostumeData
+    clone.show = sprite.show
     clone.costumesLoaded = true
+    clone.costumeMirror = sprite.costumeMirror
 
     this.render.layersOnlyAdd(clone)
 
@@ -178,7 +181,7 @@ class Engine {
   }
 
   createCloneOfMySelf (sprite) {
-    this.createCloneOf(sprite.name)
+    this.createCloneOf(sprite, sprite.name)
   }
 
   deleteThisClone (sprite) {
@@ -205,7 +208,9 @@ class Engine {
   /* event functions */
 
   whenGameStart (sprite, code) {
-    this.subscribe('whenGameStart', code, sprite)
+    if (!sprite.clone) {
+      this.subscribe('whenGameStart', code, sprite)
+    }
   }
 
   forever (sprite, code) {

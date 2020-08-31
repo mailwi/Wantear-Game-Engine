@@ -63,7 +63,7 @@ setup(function () {
         // await this.playSoundUntilDone('shoot', true)
         obj.px = this.x + 25
         obj.py = this.y + 25
-        createCloneOf('Bullet')
+        createCloneOf(this, 'Bullet')
         startSound(this, 'shoot', true)
       })
 
@@ -119,7 +119,6 @@ setup(function () {
         this.x += R.delay * 300
 
         if (touching(this, 'Enemy') || this.x > 1280) {
-          console.log('collision')
           deleteThisClone(this)
         }
       })

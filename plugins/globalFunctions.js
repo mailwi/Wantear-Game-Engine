@@ -48,8 +48,8 @@ function createSprite (name, code) {
   E.createSprite(name, code)
 }
 
-function createCloneOf (name) {
-  E.createCloneOf(name)
+function createCloneOf (sprite, name) {
+  E.createCloneOf(sprite, name)
 }
 
 function createCloneOfMySelf (sprite) {

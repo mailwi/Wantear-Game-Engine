@@ -96,20 +96,18 @@ class Render {
   }
 
   resize () {
-    const dpi = window.devicePixelRatio
-
     const height = window.innerWidth * rc
     if (height > window.innerHeight) {
-      const w = Math.floor(window.innerHeight / rc * dpi)
+      const w = Math.floor(window.innerHeight / rc)
 
       this.canvas.width = w
-      this.canvas.height = Math.floor(window.innerHeight * dpi)
+      this.canvas.height = Math.floor(window.innerHeight)
       this.sc = w / displayWidth
     } else {
-      const w = Math.floor(window.innerWidth * dpi)
+      const w = Math.floor(window.innerWidth)
 
       this.canvas.width = w
-      this.canvas.height = Math.floor(height * dpi)
+      this.canvas.height = Math.floor(height)
       this.sc = w / displayWidth
     }
   }
@@ -243,6 +241,8 @@ class Render {
   }
 
   drawCostume (sprite) {
+    if (!sprite.visible) return
+
     let costume
     if (sprite.currentCostume) {
       costume = sprite.costumes[sprite.currentCostume]
@@ -250,8 +250,8 @@ class Render {
       costume = { offsetX: 0, offsetY: 0 }
     }
 
-    const width = sprite.currentCostumeData.width * sprite.size * this.sc
-    const height = sprite.currentCostumeData.height * sprite.size * this.sc
+    const width = Math.round(sprite.currentCostumeData.width * sprite.size * this.sc + 0.5)
+    const height = Math.round(sprite.currentCostumeData.height * sprite.size * this.sc + 0.5)
 
     this.prerenderCanvas.width = width
     this.prerenderCanvas.height = height
@@ -264,7 +264,11 @@ class Render {
     }
 
     this.prerenderContext.drawImage(sprite.currentCostumeData, 0, 0, width, height)
-    this.context.drawImage(this.prerenderCanvas, (sprite.x + costume.offsetX) * this.sc, (sprite.y + costume.offsetY) * this.sc)
+
+    const x = Math.round((sprite.x + costume.offsetX) * this.sc)
+    const y = Math.round((sprite.y + costume.offsetY) * this.sc)
+
+    this.context.drawImage(this.prerenderCanvas, x, y)
   }
 
   /* layer functions */
@@ -359,8 +363,13 @@ class Render {
     }
 
     for (let i = 0; i < this.collisionShapes.length; i++) {
+      const collisionShape = this.collisionShapes[i]
       for (let j = i + 1; j < this.collisionShapes.length; j++) {
-        if (this.collisionShapes[i]) this.collisionShapes[i].eval(this.collisionShapes[j])
+        const otherCollisionShape = this.collisionShapes[j]
+        if (collisionShape && collisionShape.sprite.visible &&
+          otherCollisionShape && otherCollisionShape.sprite.visible) {
+          collisionShape.eval(otherCollisionShape)
+        }
       }
     }
   }

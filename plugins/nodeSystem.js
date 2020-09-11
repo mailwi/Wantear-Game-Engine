@@ -102,6 +102,18 @@ class BasicNode {
     return name in this.childs
   }
 
+  unsubscribeAll () {
+    for (const key in E.events) {
+      const sprites = E.events[key]
+      const index = sprites.findIndex((spriteData) => spriteData && spriteData.sprite === this)
+      if (index !== -1) {
+        sprites[index] = null
+      }
+    }
+
+    E.countToTrash++
+  }
+
   removeChild (node) {
     if (node.name in this.childs) {
       const child = this.childs[node.name]
@@ -135,18 +147,40 @@ class BasicNode {
 
   removeSprite (spriteNode) {
     this.removeChild(spriteNode)
-    spriteNode.deleteClone()
+    spriteNode.delete()
+    spriteNode.unsubscribeAll()
   }
 
   removeSprites () {
     for (let i = 0; i < this.childsOrder.length; i++) {
       this.childsOrder[i].index = -1
       this.childsOrder[i].parent = null
-      this.childsOrder[i].deleteClone()
+      if (this.childsOrder[i] instanceof SpriteNode) this.childsOrder[i].delete()
+      this.childsOrder[i].unsubscribeAll()
     }
 
     this.childs = {}
     this.childsOrder = []
+  }
+
+  removeDeepSprites () {
+    for (let i = 0; i < this.childsOrder.length; i++) {
+      this.childsOrder[i].index = -1
+      this.childsOrder[i].parent = null
+      if (this.childsOrder[i] instanceof SpriteNode) this.childsOrder[i].delete()
+      this.childsOrder[i].unsubscribeAll()
+      this.childsOrder[i].removeDeepSprites()
+    }
+
+    this.childs = {}
+    this.childsOrder = []
+  }
+
+  deleteThis () {
+    if (this.parent) {
+      this.parent.removeChild(this)
+    }
+    this.removeDeepSprites()
   }
 
   forEach (f) {
@@ -174,15 +208,19 @@ class SpriteNode extends BasicNode {
 
         if (spriteData.costumes) addCostumes(this, spriteData.costumes)
         if (spriteData.sounds) addSounds(this, spriteData.sounds)
-        if (this.clone && collision) {
-          if (collision instanceof Function) {
-            this.nodeCollision = collision
-            this.nodeCollision()
-          } else {
-            if (collision.length > 2) {
-              collisionRect(this, collision[0], collision[1], collision[2], collision[3])
+        if (this.clone) {
+          if (spriteData.data) this.local = Object.assign(this.local, spriteData.data)
+
+          if (collision) {
+            if (collision instanceof Function) {
+              this.nodeCollision = collision
+              this.nodeCollision()
             } else {
-              collisionPoint(this, collision[0], collision[1])
+              if (collision.length > 2) {
+                collisionRect(this, collision[0], collision[1], collision[2], collision[3])
+              } else {
+                collisionPoint(this, collision[0], collision[1])
+              }
             }
           }
         }
@@ -193,26 +231,27 @@ class SpriteNode extends BasicNode {
 
         if (spriteData.start) {
           this.nodeStart = spriteData.start
-          whenGameStart(this, async () => {
-            await this.costumesLoaded
-            await this.soundsLoaded
-
-            if (!spriteData.clone && spriteData.wait) {
-              this.nodeWait = spriteData.wait
-              foreverWait(this, async () => {
-                await this.nodeWait()
-              })
-            }
-
-            await this.nodeStart()
-          })
         }
+        whenGameStart(this, async () => {
+          await this.costumesLoaded
+          await this.soundsLoaded
+
+          if (!spriteData.clone && spriteData.wait) {
+            this.nodeWait = spriteData.wait
+            foreverWait(this, async () => {
+              await this.nodeWait()
+            })
+          }
+
+          if (spriteData.start) {
+            await this.nodeStart()
+          }
+        })
 
         if (spriteData.clone) {
           this.whenIStartAsAClone(() => {
             this.node = new SpriteNode({ name: this.name, clone: this }, true)
             if (spriteData.parent) spriteData.parent.addChild(this.node)
-            if (spriteData.data) this.local = spriteData.data
             this.show()
 
             if (spriteData.layer !== undefined) this.layer = spriteData.layer
@@ -309,6 +348,11 @@ class SpriteNode extends BasicNode {
     if (this.isClone) {
       deleteThisClone(this.sprite)
     }
+  }
+
+  deleteThis () {
+    this.delete()
+    super.deleteThis()
   }
 
   deleteAllClones () {

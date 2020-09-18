@@ -208,6 +208,7 @@ class SpriteNode extends BasicNode {
 
         if (spriteData.costumes) addCostumes(this, spriteData.costumes)
         if (spriteData.sounds) addSounds(this, spriteData.sounds)
+        if (spriteData.music) addMusic(this, spriteData.music)
         if (this.clone) {
           if (spriteData.data) this.local = Object.assign(this.local, spriteData.data)
 
@@ -235,6 +236,7 @@ class SpriteNode extends BasicNode {
         whenGameStart(this, async () => {
           await this.costumesLoaded
           await this.soundsLoaded
+          await this.musicLoaded
 
           if (!spriteData.clone && spriteData.wait) {
             this.nodeWait = spriteData.wait

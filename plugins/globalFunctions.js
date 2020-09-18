@@ -34,12 +34,28 @@ function addSounds (sprite, sounds) {
   A.addSounds(sprite, sounds)
 }
 
-function startSound (sprite, name, instanceSound) {
+function addMusic (sprite, music) {
+  A.addMusic(sprite, music)
+}
+
+function startSound (sprite, name, instanceSound) { // audioHTML
   A.startSound(sprite, name, instanceSound)
+}
+
+function startAudio (sprite, name) { // audioWeb
+  A.startAudio(sprite, name)
 }
 
 async function playSoundUntilDone (sprite, name, instanceSound = false) {
   await A.playSoundUntilDone(sprite, name, instanceSound = false)
+}
+
+async function playMusicUntilDone (sprite, name) {
+  await A.playMusicUntilDone(sprite, name)
+}
+
+function setVolumeTo (sprite, name, volume) {
+  A.setVolumeTo(sprite, name, volume)
 }
 
 /* engine functions */

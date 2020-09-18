@@ -1,5 +1,5 @@
 class AudioEngine {
-  async addSounds (sprite, sounds) {
+  async _addSounds (sprite, sounds) {
     function getSound (data) {
       return new Promise((resolve) => {
         const sound = new Audio(data)
@@ -10,6 +10,10 @@ class AudioEngine {
     for (const name in sounds) {
       sprite.sounds[name] = await getSound(sounds[name])
     }
+  }
+
+  addSounds (sprite, sounds) {
+    sprite.soundsLoaded = this._addSounds(sprite, sounds)
   }
 
   async playSoundUntilDone (sprite, name, instanceSound = false) {

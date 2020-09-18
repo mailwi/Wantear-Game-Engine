@@ -1,6 +1,8 @@
 setup(function () {
   R.seeCollisions = true
 
+  A.createContext()
+
   const obj = {
     score: 0,
     px: 0,
@@ -16,8 +18,11 @@ setup(function () {
     ])
 
     addSounds(this, {
-      music: 'sounds/hero.mp3',
       shoot: 'sounds/bow.ogg'
+    })
+
+    addMusic(this, {
+      music: 'sounds/hero.mp3'
     })
 
     collisionRect(this, 25, 32, 50, 50)
@@ -28,8 +33,9 @@ setup(function () {
     whenGameStart(this, async () => {
       await this.costumesLoaded
       await this.soundsLoaded
-      // A.startSound(this, 'music')
-      // A.setVolumeTo(this, 'music', 0.25)
+      await this.musicLoaded
+      startAudio(this, 'music')
+      setVolumeTo(this, 'music', 0.25)
 
       this.goto(100, 100)
 
@@ -64,7 +70,7 @@ setup(function () {
         obj.px = this.x + 25
         obj.py = this.y + 25
         createCloneOf(this, 'Bullet')
-        startSound(this, 'shoot', true)
+        startAudio(this, 'shoot')
       })
 
       foreverWait(this, async () => {

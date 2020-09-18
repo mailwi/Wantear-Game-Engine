@@ -292,6 +292,7 @@ class Sprite {
 
     this.sounds = {}
     this.soundsLoaded = null
+    this.musicLoaded = null
 
     this.collisionShape = null
     this.whenThisSpriteClickedEvent = null

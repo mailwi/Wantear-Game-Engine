@@ -1,4 +1,6 @@
-class Camera {
+import { whenIReceive, broadcast } from './globalFunctions'
+
+export default class Camera {
   constructor (data, x, y) {
     this.data = data
     this.x = x

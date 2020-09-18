@@ -1,12 +1,12 @@
 /* Render class */
 
-const displayWidth = 1280
-const displayHeight = 720
-const rc = displayHeight / displayWidth
+export const displayWidth = 1280
+export const displayHeight = 720
+export const rc = displayHeight / displayWidth
 
-const layersNeedLogic = true
-const collisionsNeedLogic = true
-const is2D = true
+export const layersNeedLogic = true
+export const collisionsNeedLogic = true
+export const is2D = true
 
 class Render {
   constructor () {
@@ -400,8 +400,8 @@ class Render {
           this.rect(collisionShape.sprite.x + collisionShape.sprite.drawX + collisionShape.x - 2, collisionShape.sprite.y + collisionShape.sprite.drawY + collisionShape.y - 2, 4, 4)
         }
 
-        font(12, 'Arial')
-        if (collisionShape) text(collisionShape.sprite.name, collisionShape.sprite.x + collisionShape.sprite.drawX + collisionShape.x - 2, collisionShape.sprite.y + collisionShape.sprite.drawY + collisionShape.y - 10)
+        this.font(12, 'Arial')
+        if (collisionShape) this.text(collisionShape.sprite.name, collisionShape.sprite.x + collisionShape.sprite.drawX + collisionShape.x - 2, collisionShape.sprite.y + collisionShape.sprite.drawY + collisionShape.y - 10)
       }
     }
   }
@@ -415,37 +415,39 @@ class Render {
 
   /* mouse */
 
-  mouseLogic () {
-    R.collisionPoint(this, 0, 0)
+  mouseLogic (R, E) {
+    return function () {
+      R.collisionPoint(this, 0, 0)
 
-    E.whenGameStart(this, () => {
-      R.canvas.addEventListener('mouseup', _ => {
-        if (this.collisionShape.colliding()) {
-          const collidingShapes = this.collisionShape.collidingShapes
-          const sprites = []
+      E.whenGameStart(this, () => {
+        R.canvas.addEventListener('mouseup', _ => {
+          if (this.collisionShape.colliding()) {
+            const collidingShapes = this.collisionShape.collidingShapes
+            const sprites = []
 
-          for (const name in collidingShapes) {
-            const shapes = collidingShapes[name]
-            for (let i = 0; i < shapes.length; i++) {
-              sprites.push(shapes[i].sprite)
+            for (const name in collidingShapes) {
+              const shapes = collidingShapes[name]
+              for (let i = 0; i < shapes.length; i++) {
+                sprites.push(shapes[i].sprite)
+              }
+            }
+
+            sprites.sort((a, b) => {
+              return b.layer - a.layer
+            })
+
+            const sprite = sprites[0]
+            if (sprite.whenThisSpriteClickedEvent) {
+              sprite.whenThisSpriteClickedEvent()
             }
           }
+        })
 
-          sprites.sort((a, b) => {
-            return b.layer - a.layer
-          })
-
-          const sprite = sprites[0]
-          if (sprite.whenThisSpriteClickedEvent) {
-            sprite.whenThisSpriteClickedEvent()
-          }
-        }
+        E.forever(this, () => {
+          this.goto(E.mouseX, E.mouseY)
+        })
       })
-
-      E.forever(this, () => {
-        this.goto(E.mouseX, E.mouseY)
-      })
-    })
+    }
   }
 }
 
@@ -543,4 +545,4 @@ class CollisionRect extends CollisionShape {
   }
 }
 
-const R = new Render()
+export const R = new Render()

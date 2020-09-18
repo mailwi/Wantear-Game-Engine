@@ -1,4 +1,15 @@
-class BasicNode {
+import {
+  E,
+  createSprite,
+  addCostumes, addSounds, addMusic,
+  whenGameStart,
+  createCloneOf,
+  collisionRect,
+  foreverWait,
+  drawCostume
+} from './globalFunctions'
+
+export class BasicNode {
   constructor (name) {
     this.name = name
     this.childs = {}
@@ -196,7 +207,7 @@ class BasicNode {
   }
 }
 
-class SpriteNode extends BasicNode {
+export class SpriteNode extends BasicNode {
   constructor (spriteData, clone = false) {
     if (!clone) {
       super(spriteData.name)
@@ -371,8 +382,4 @@ class SpriteNode extends BasicNode {
       children[i].deleteClonesTree()
     }
   }
-}
-
-function createNode (name) {
-  return new Node(name)
 }

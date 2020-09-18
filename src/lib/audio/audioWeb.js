@@ -147,4 +147,4 @@ class AudioWeb {
   }
 }
 
-const A = new AudioEngine()
+export const A = new AudioEngine()

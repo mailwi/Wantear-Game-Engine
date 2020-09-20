@@ -1,0 +1,12 @@
+#gui {
+  position: absolute;
+  pointer-events: none;
+}
+
+.elm {
+  pointer-events: all;
+}
+
+.show {
+  color: red;
+}

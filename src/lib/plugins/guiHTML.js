@@ -1,3 +1,5 @@
+import { rc, displayWidth } from '../renders/renderCanvas'
+
 class GUI {
   constructor () {
     this.root = document.createElement('div')
@@ -6,6 +8,11 @@ class GUI {
     document.body.append(this.root)
 
     this.sc = 1
+
+    this.oldTranslateX = 0
+    this.oldTranslateY = 0
+    this.translateX = 0
+    this.translateY = 0
 
     this.strokeStyle = 'rgb(0, 0, 0)'
     this.fillStyle = 'rgb(0, 0, 0)'
@@ -17,6 +24,8 @@ class GUI {
     this.queueIndex = 0
 
     this.cachedItem = null
+
+    this.clicked = {}
 
     window.addEventListener('resize', () => {
       this.resize()
@@ -50,6 +59,10 @@ class GUI {
 
   reset () {
     this.queueIndex = 0
+    this.oldTranslateX = 0
+    this.oldTranslateY = 0
+    this.translateX = 0
+    this.translateY = 0
   }
 
   noStroke () {
@@ -95,16 +108,31 @@ class GUI {
     }
   }
 
-  rect (x, y, w, h = w) {
+  translate (x, y) {
+    this.translateX += x
+    this.translateY += y
+  }
+
+  push () {
+    this.oldTranslateX = this.translateX
+    this.oldTranslateY = this.translateY
+  }
+
+  pop () {
+    this.translateX = this.oldTranslateX
+    this.translateY = this.oldTranslateY
+  }
+
+  rect (x, y, w, h = w, click = false) {
     if (this.cached()) {
-      this.setXY(x, y)
+      this.setXY(this.translateX + x, this.translateY + y)
       this.setWH(w, h)
       this.setStyles()
     } else {
       const r = document.createElement('div')
       r.style.position = 'absolute'
-      r.style.left = x * this.sc + 'px'
-      r.style.top = y * this.sc + 'px'
+      r.style.left = this.translateX + x * this.sc + 'px'
+      r.style.top = this.translateY + y * this.sc + 'px'
       r.style.width = w * this.sc + 'px'
       r.style.height = h * this.sc + 'px'
       r.style.borderColor = this.strokeStyle
@@ -118,3 +146,5 @@ class GUI {
 }
 
 const gui = new GUI()
+
+export { gui }

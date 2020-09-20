@@ -9,6 +9,10 @@ import {
   touching, createCloneOf, deleteThisClone
 } from './lib/plugins/globalFunctions'
 
+import HomeScreen from './gui/homeScreen'
+
+const homeScreen = new HomeScreen()
+
 setup(function () {
   R.seeCollisions = true
 
@@ -45,8 +49,8 @@ setup(function () {
       await this.costumesLoaded
       await this.soundsLoaded
       await this.musicLoaded
-      startAudio(this, 'music')
-      setVolumeTo(this, 'music', 0.25)
+      // startAudio(this, 'music')
+      // setVolumeTo(this, 'music', 0.25)
 
       this.goto(100, 100)
 

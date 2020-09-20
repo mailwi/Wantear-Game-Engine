@@ -122,25 +122,25 @@ class Render {
     const delay = (timeStamp - this.oldTimeStamp) / 1000
     const fps = Math.round(1 / delay)
 
-    if (fps < 31) {
+    if (fps > 5) {
       this.delay = delay
       this.oldTimeStamp = timeStamp
 
       this.fps = Math.round(1 / this.delay)
-
-      if (this.engine.countToTrash > 50) {
-        this.layersToTrash()
-        this.collisionsToTrash()
-      }
-
-      this.collisionsLoop()
-
-      this.engine.gameLoop()
-
-      this.clear()
-      this.layersLoop()
-      this.drawCollisions()
     }
+
+    if (this.engine.countToTrash > 50) {
+      this.layersToTrash()
+      this.collisionsToTrash()
+    }
+
+    this.collisionsLoop()
+
+    this.engine.gameLoop()
+
+    this.clear()
+    this.layersLoop()
+    this.drawCollisions()
 
     window.requestAnimationFrame(this.gameLoopFunc)
   }
